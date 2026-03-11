@@ -154,10 +154,10 @@ const SettingsScreen = ({ navigation }) => {
         <Card.Content>
           <Title style={styles.title}>About</Title>
           <Text style={styles.aboutText}>
-            Smart Budget Tracker Mobile v1.0
+            TRIKIA Mobile v1.0
           </Text>
           <Text style={styles.aboutText}>
-            Track your expenses on the go with this mobile app.
+            Your Personal AI Budget Tracker on the go
           </Text>
           <Text style={styles.aboutText}>
             All data is stored locally on your device for privacy.

@@ -16,6 +16,7 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
   const [activeView, setActiveView] = useState('all'); // 'all', 'account-<id>'
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all'); // 'all', 'week', 'month', 'year'
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all'); // 'all', 'upi', 'netbanking', 'creditcard', 'debitcard', 'cash'
   const [showAmounts, setShowAmounts] = useState(true);
   
   // Defensive checks - ensure arrays
@@ -50,6 +51,27 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
           return new Date(tx?.date || Date.now()) >= filterDate;
         } catch (e) {
           return false;
+        }
+      });
+    }
+
+    // Payment method filtering
+    if (paymentMethodFilter !== 'all') {
+      filtered = filtered.filter(tx => {
+        const txPaymentMethod = tx?.paymentMethod?.toLowerCase() || '';
+        switch (paymentMethodFilter) {
+          case 'upi':
+            return txPaymentMethod === 'upi';
+          case 'netbanking':
+            return txPaymentMethod === 'netbanking';
+          case 'creditcard':
+            return txPaymentMethod === 'creditcard';
+          case 'debitcard':
+            return txPaymentMethod === 'debitcard';
+          case 'cash':
+            return txPaymentMethod === 'cash';
+          default:
+            return true;
         }
       });
     }
@@ -154,7 +176,7 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -179,6 +201,23 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
             <option value="week" className="bg-gray-800">Last Week</option>
             <option value="month" className="bg-gray-800">Last Month</option>
             <option value="year" className="bg-gray-800">Last Year</option>
+          </select>
+        </div>
+
+        {/* Payment Method Filter */}
+        <div className="relative">
+          <Wallet className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <select
+            value={paymentMethodFilter}
+            onChange={(e) => setPaymentMethodFilter(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+          >
+            <option value="all" className="bg-gray-800">All Payment Methods</option>
+            <option value="upi" className="bg-gray-800">UPI</option>
+            <option value="netbanking" className="bg-gray-800">Net Banking</option>
+            <option value="creditcard" className="bg-gray-800">Credit Card</option>
+            <option value="debitcard" className="bg-gray-800">Debit Card</option>
+            <option value="cash" className="bg-gray-800">Cash</option>
           </select>
         </div>
 

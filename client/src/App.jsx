@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Wallet, User, BarChart3, FileText, Settings, Home, LogOut, Sun, Moon, Calculator, AlertTriangle, MessageSquare, PiggyBank, Edit3, Trash2, Users } from 'lucide-react';
+import { Menu, X, Wallet, User, BarChart3, FileText, Settings, Home, LogOut, Sun, Moon, Calculator, AlertTriangle, MessageSquare, PiggyBank, Edit3, Trash2, Users, Shield, Lock, CheckCircle, Brain, Eye } from 'lucide-react';
 
 // Toast notification state - replaces blocking alert() calls
 let globalSetToast = null; // Will be set by AppContent component
@@ -172,14 +172,22 @@ const Navbar = ({ activeTab, setActiveTab, user, onLogout }) => {
             <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg animate-classy-pulse">
               <Wallet className="h-6 w-6 text-white" />
             </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-300 to-indigo-300 bg-clip-text text-transparent">
-                AI Budget Tracker
+            <div className="flex flex-col">
+              <h1 className="text-xl md:text-2xl font-black bg-gradient-to-r from-blue-300 via-indigo-300 to-purple-300 bg-clip-text text-transparent tracking-tight">
+                TRIKIA
               </h1>
+              <p className="text-xs md:text-sm font-medium text-gray-400 mt-0.5">
+                AI Budget Tracker
+              </p>
               {user && (
-                <p className="text-sm text-gray-300">
-                  Welcome, {user.name}
-                </p>
+                <motion.p 
+                  className="text-sm md:text-base text-gray-300 italic mt-1"
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  Welcome, <span className="font-semibold text-white">{user.name}</span>
+                </motion.p>
               )}
             </div>
           </motion.div>
@@ -346,6 +354,8 @@ function AppContent() {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const { isDarkMode } = useTheme();
 
@@ -411,20 +421,79 @@ function AppContent() {
     setIsAuthenticated(true);
     setUser(userData);
     setShowWelcome(false); // Hide welcome screen after successful authentication
-    setActiveTab('dashboard');
-    // Load user-specific transactions
-    loadUserTransactions(userData.id);
+    
+    // Check if user has already accepted terms
+    const termsAcceptedKey = `terms_accepted_${userData.id}`;
+    const hasAcceptedTerms = localStorage.getItem(termsAcceptedKey);
+    
+    if (!hasAcceptedTerms) {
+      // Show Terms & Conditions modal for first-time users
+      setShowTermsModal(true);
+    } else {
+      setTermsAccepted(true);
+      setActiveTab('dashboard');
+      // Load user-specific transactions
+      loadUserTransactions(userData.id);
+    }
   };
 
   const handleVerificationSuccess = (userData) => {
     setIsAuthenticated(true);
     setUser(userData);
     setShowWelcome(false); // Hide welcome screen after successful verification
-    setActiveTab('dashboard');
-    // Load user-specific transactions
-    loadUserTransactions(userData.id);
-    // Redirect to dashboard
-    window.history.replaceState(null, '', '/');
+    
+    // Check if user has already accepted terms
+    const termsAcceptedKey = `terms_accepted_${userData.id}`;
+    const hasAcceptedTerms = localStorage.getItem(termsAcceptedKey);
+    
+    if (!hasAcceptedTerms) {
+      setShowTermsModal(true);
+    } else {
+      setTermsAccepted(true);
+      setActiveTab('dashboard');
+      // Load user-specific transactions
+      loadUserTransactions(userData.id);
+      // Redirect to dashboard
+      window.history.replaceState(null, '', '/');
+    }
+  };
+
+  // Handle Terms & Conditions acceptance
+  const handleAcceptTerms = () => {
+    if (user && user.id) {
+      const termsAcceptedKey = `terms_accepted_${user.id}`;
+      localStorage.setItem(termsAcceptedKey, 'true');
+      setTermsAccepted(true);
+      setShowTermsModal(false);
+      setActiveTab('dashboard');
+      // Load user-specific transactions
+      loadUserTransactions(user.id);
+      // Load user-specific bank accounts
+      loadUserBankAccounts(user.id);
+      
+      // Show success toast
+      setToast({ 
+        show: true, 
+        message: '✅ Welcome! Let\'s start managing your budget wisely!', 
+        type: 'success' 
+      });
+    }
+  };
+
+  // Handle Terms rejection (logout)
+  const handleRejectTerms = () => {
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
+    setUser(null);
+    setShowWelcome(true);
+    setShowTermsModal(false);
+    setToast({ 
+      show: true, 
+      message: 'You must accept the terms to continue using the app.', 
+      type: 'warning' 
+    });
   };
 
   const handleLogout = () => {
@@ -872,8 +941,8 @@ function AppContent() {
             <DailyExpenseReminder user={user} transactions={safeTransactions} settings={userSettings.notifications} />
             {/* Dashboard Header */}
             <div className="text-center py-8 animate-elegant-entrance">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent mb-4">
-                {safeTransactions.length === 0 ? 'Welcome to AI Budget Tracker!' : `Hello, ${user.name}!`}
+              <h1 className="text-4xl font-black bg-gradient-to-r from-green-300 via-emerald-400 to-teal-400 bg-clip-text text-transparent mb-4">
+                {safeTransactions.length === 0 ? 'Welcome to TRIKIA!' : `Hello, ${user.name}!`}
               </h1>
               <p className="text-gray-300 text-lg max-w-2xl mx-auto">
                 {safeTransactions.length === 0 
@@ -981,7 +1050,11 @@ function AppContent() {
                   user={user}
                 />
                 
-                <PaymentReminders user={user} bankAccounts={bankAccounts} />
+                <PaymentReminders 
+                  user={user} 
+                  bankAccounts={bankAccounts}
+                  onAutoDeductPayment={handleAddTransaction}
+                />
               </div>
             </div>
           </>
@@ -1057,6 +1130,266 @@ function AppContent() {
             onDelete={handleDeleteTransaction}
             accounts={bankAccounts}
           />
+
+          {/* Terms & Conditions Modal */}
+          <AnimatePresence>
+            {showTermsModal && (
+              <motion.div
+                className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <motion.div
+                  className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-xl border border-blue-500/30 rounded-2xl p-8 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+                  initial={{ scale: 0.9, y: -20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.9, y: -20 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center space-x-4 mb-6 pb-5 border-b border-white/10">
+                    <motion.div 
+                      className="p-3.5 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-xl shadow-2xl ring-2 ring-white/20"
+                      whileHover={{ scale: 1.08, rotate: 5 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <Shield className="h-9 w-9 text-white drop-shadow-lg" />
+                    </motion.div>
+                    <div>
+                      <motion.h2 
+                        className="text-4xl font-black tracking-tight bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 bg-clip-text text-transparent drop-shadow-2xl"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2, duration: 0.5 }}
+                      >
+                        Welcome to TRIKIA
+                      </motion.h2>
+                      <motion.p 
+                        className="text-lg font-semibold text-white mt-1.5"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.4 }}
+                      >
+                        AI Budget Tracker
+                      </motion.p>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="space-y-6 mb-8">
+                    {/* Privacy Feature 1 */}
+                    <motion.div 
+                      className="flex items-start space-x-4 bg-blue-500/10 border border-blue-400/20 rounded-xl p-4 backdrop-blur-xl"
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <motion.div
+                        whileHover={{ rotate: 360 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <Lock className="h-6 w-6 text-blue-400 flex-shrink-0 mt-1" />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-2">🔒 Local Storage Only</h3>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          All your data is stored securely on your device. Nothing is uploaded, shared, or downloaded to external servers. Your financial information never leaves your device.
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    {/* Privacy Feature 2 */}
+                    <motion.div 
+                      className="flex items-start space-x-4 bg-green-500/10 border border-green-400/20 rounded-xl p-4 backdrop-blur-xl"
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <motion.div
+                        whileHover={{ rotate: 360 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <Shield className="h-6 w-6 text-green-400 flex-shrink-0 mt-1" />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-2">🛡️ Your Privacy Matters</h3>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          No bank account details or sensitive financial information are collected. The app only tracks what you enter for your own personal use and insights.
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    {/* Privacy Feature 3 - Phone/Bank Messages */}
+                    <motion.div 
+                      className="flex items-start space-x-4 bg-emerald-500/10 border border-emerald-400/20 rounded-xl p-4 backdrop-blur-xl"
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <motion.div
+                        whileHover={{ rotate: 360 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <svg className="h-6 w-6 text-emerald-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-2">📱 Phone & Bank Messages Secure</h3>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          None of your phone calls, SMS messages, or bank messages are being accessed by us. Your privacy is secured - we only use the transaction data you manually enter into the app.
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    {/* Privacy Feature 3 */}
+                    <motion.div 
+                      className="flex items-start space-x-4 bg-purple-500/10 border border-purple-400/20 rounded-xl p-4 backdrop-blur-xl"
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <motion.div
+                        whileHover={{ rotate: 360 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <User className="h-6 w-6 text-purple-400 flex-shrink-0 mt-1" />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-2">👤 You're in Control</h3>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          None of your data can be accessed by anyone other than you on this device. You have complete ownership and control over all your financial information.
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    {/* Privacy Feature 4 */}
+                    <motion.div 
+                      className="flex items-start space-x-4 bg-orange-500/10 border border-orange-400/20 rounded-xl p-4 backdrop-blur-xl"
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <motion.div
+                        whileHover={{ rotate: 360 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <Brain className="h-6 w-6 text-orange-400 flex-shrink-0 mt-1" />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-2">🤖 Smart Assistance</h3>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          A built-in chat assistant and voice assistant are available to help you manage your budget. They work entirely with your locally stored data — no external access or data sharing.
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    {/* Privacy Feature 5 */}
+                    <motion.div 
+                      className="flex items-start space-x-4 bg-cyan-500/10 border border-cyan-400/20 rounded-xl p-4 backdrop-blur-xl"
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <motion.div
+                        whileHover={{ rotate: 360 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        <Eye className="h-6 w-6 text-cyan-400 flex-shrink-0 mt-1" />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-2">✅ Transparency First</h3>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          This app is designed purely for personal tracking and insights. You remain the sole owner of your information. No hidden agendas, no data mining, no third-party access.
+                        </p>
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Benefits Section */}
+                  <motion.div 
+                    className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-white/20 rounded-2xl p-6 mb-6 backdrop-blur-xl shadow-2xl"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <h3 className="text-xl font-black text-white mb-4 flex items-center">
+                      <motion.div
+                        animate={{ rotate: [0, 360] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      >
+                        <CheckCircle className="h-6 w-6 text-green-400 mr-3" />
+                      </motion.div>
+                      Key Benefits:
+                    </h3>
+                    <ul className="space-y-3">
+                      {['100% Private & Secure - Your data stays on your device', 'AI-Powered Insights - Smart assistance without compromising privacy', 'Complete Control - You own your data, always', 'No External Servers - Everything runs locally', 'Free Forever - No hidden costs or premium tiers'].map((benefit, index) => (
+                        <motion.li 
+                          key={index}
+                          className="flex items-start text-gray-200"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.3 + index * 0.1 }}
+                          whileHover={{ x: 5, scale: 1.02 }}
+                        >
+                          <motion.span 
+                            className="text-green-400 mr-3 text-lg"
+                            whileHover={{ scale: 1.3, rotate: 15 }}
+                          >✓</motion.span>
+                          <span className="font-medium">{benefit}</span>
+                        </motion.li>
+                      ))}
+                    </ul>
+                  </motion.div>
+
+                  {/* Acceptance Checkbox */}
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6">
+                    <label className="flex items-start space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 rounded focus:ring-blue-500 focus:ring-2 mt-1"
+                      />
+                      <span className="text-sm text-gray-300">
+                        By continuing, you acknowledge and agree to these terms. You understand that this app is for personal budget tracking purposes only and that all data remains stored locally on your device.
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <motion.button
+                      onClick={handleRejectTerms}
+                      whileHover={{ scale: 1.05, y: -3 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                      className="flex-1 px-8 py-4 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl"
+                    >
+                      Exit App
+                    </motion.button>
+                    <motion.button
+                      onClick={handleAcceptTerms}
+                      disabled={!termsAccepted}
+                      whileHover={termsAccepted ? { scale: 1.05, y: -3 } : {}}
+                      whileTap={termsAccepted ? { scale: 0.95 } : {}}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                      className={`flex-1 px-8 py-4 rounded-xl font-bold transition-all shadow-lg ${
+                        termsAccepted
+                          ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white shadow-blue-500/30 hover:shadow-blue-500/50'
+                          : 'bg-gradient-to-r from-gray-700 to-gray-600 text-gray-500 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      Accept & Continue ✨
+                    </motion.button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       </div>
     </div>

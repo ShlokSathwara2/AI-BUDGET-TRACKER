@@ -166,6 +166,39 @@ const SavingPlanner = ({ transactions = [] }) => {
         </motion.button>
       </div>
       
+      {/* Info Box - What are Savings Goals For */}
+      <motion.div 
+        className="mb-6 p-5 bg-gradient-to-r from-blue-500/15 via-purple-500/15 to-blue-500/15 rounded-xl border border-blue-400/30 backdrop-blur-sm"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="flex items-start space-x-3">
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex-shrink-0">
+            <Target className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-white font-bold text-base mb-2">What are Savings Goals For?</h3>
+            <p className="text-gray-300 text-sm leading-relaxed mb-3">
+              Savings Goals help you save money systematically for specific objectives like emergency funds, vacations, big purchases, or any financial target. The AI analyzes your spending patterns and suggests realistic savings amounts based on your income and expenses.
+            </p>
+            <div className="bg-white/5 rounded-lg p-3 border border-blue-400/20">
+              <h4 className="text-blue-300 font-semibold text-xs mb-2">How to Use:</h4>
+              <ol className="text-gray-300 text-xs space-y-1 list-decimal list-inside">
+                <li>Click "Add Goal" button above</li>
+                <li>Enter goal name (e.g., "Emergency Fund", "Vacation")</li>
+                <li>Set target amount you want to save</li>
+                <li>Choose a deadline for your goal</li>
+                <li>Select priority level (High/Medium/Low)</li>
+                <li>AI will suggest optimal monthly savings amount</li>
+                <li>Track progress and get AI-powered insights</li>
+                <li>Add contributions as you save money toward your goal</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+      
       {/* AI Insights Section */}
       {aiInsights && (
         <motion.div 

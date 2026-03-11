@@ -219,6 +219,37 @@ const FamilyBudgetManager = ({ currentUser, transactions = [], bankAccounts = []
         </div>
       </div>
 
+      {/* Info Box - What is Family Budget For */}
+      <motion.div 
+        className="mb-6 p-5 bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-purple-500/15 rounded-xl border border-purple-400/30 backdrop-blur-sm"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="flex items-start space-x-3">
+          <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex-shrink-0">
+            <Users className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-white font-bold text-base mb-2">What is Family Budget For?</h3>
+            <p className="text-gray-300 text-sm leading-relaxed mb-3">
+              The Family Budget feature allows you to securely share your financial data with family members (spouse, partner, etc.) so you can both view and manage household finances together. Perfect for couples who want to track their combined income, expenses, and savings goals.
+            </p>
+            <div className="bg-white/5 rounded-lg p-3 border border-purple-400/20">
+              <h4 className="text-purple-300 font-semibold text-xs mb-2">How to Use:</h4>
+              <ol className="text-gray-300 text-xs space-y-1 list-decimal list-inside">
+                <li>Click "Add Family Member" button below</li>
+                <li>Enter your family member's email address</li>
+                <li>They'll receive a verification code (demo code: <span className="text-purple-300 font-mono bg-purple-500/20 px-1 rounded">123456</span>)</li>
+                <li>Once verified, they can access shared budget data</li>
+                <li>Toggle visibility to hide/show amounts for privacy</li>
+                <li>View combined income, expenses, and net flow across all family members</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Family Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">

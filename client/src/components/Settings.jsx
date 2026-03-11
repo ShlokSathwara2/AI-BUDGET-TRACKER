@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Bell, Shield, Globe, Moon, Sun, CreditCard, Download, Upload, Trash2, Save, Eye, EyeOff, Check } from 'lucide-react';
+import { User, Bell, Shield, Globe, Moon, Sun, CreditCard, Download, Upload, Trash2, Save, Eye, EyeOff, Check, Mail, MessageCircle } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -582,6 +582,64 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
             <p className="text-gray-400 text-sm">Switch between light and dark themes</p>
           </div>
           <ThemeToggle />
+        </div>
+      </motion.div>
+
+      {/* Contact for Suggestions */}
+      <motion.div 
+        className="bg-gradient-to-br from-emerald-500/20 to-cyan-500/10 backdrop-blur-xl border border-emerald-400/30 rounded-2xl p-6 shadow-2xl classy-element"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.45 }}
+      >
+        <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+          <MessageCircle className="h-5 w-5 text-emerald-400" />
+          <span>Contact for Suggestions</span>
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-start space-x-4 bg-white/5 rounded-xl p-4 border border-emerald-400/20">
+            <div className="p-3 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl shadow-lg">
+              <Mail className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-white font-bold text-lg mb-1">Need Help or Have Suggestions?</h4>
+              <p className="text-gray-300 text-sm mb-3 leading-relaxed">
+                Feel free to reach out for any suggestions, feedback, or assistance. I'm here to help!
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-sm">
+                  <User className="h-4 w-4 text-emerald-400" />
+                  <span className="text-white font-semibold">Shlok Sathwara</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm">
+                  <Mail className="h-4 w-4 text-cyan-400" />
+                  <a 
+                    href="mailto:shloksathwara2@gmail.com" 
+                    className="text-cyan-300 hover:text-cyan-200 underline font-medium transition-colors"
+                  >
+                    shloksathwara2@gmail.com
+                  </a>
+                </div>
+                <div className="flex items-center space-x-2 text-sm">
+                  <svg className="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <a 
+                    href="tel:+919687271268" 
+                    className="text-green-300 hover:text-green-200 underline font-medium transition-colors"
+                  >
+                    +91 96872 71268
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 p-4 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-blue-500/10 rounded-xl border border-emerald-400/20 backdrop-blur-sm">
+            <p className="text-emerald-200 text-xs text-center italic">
+              💡 Your feedback helps improve TRIKIA for everyone!
+            </p>
+          </div>
         </div>
       </motion.div>
 

@@ -9,8 +9,8 @@ const WelcomeScreen = ({ onComplete, isAuthenticated }) => {
   // Slides for the welcome carousel
   const slides = [
     {
-      title: "Welcome to AI Budget Tracker",
-      subtitle: "Your Personal Finance Assistant",
+      title: "Welcome to TRIKIA",
+      subtitle: "Your Personal AI Budget Tracker",
       description: "Track expenses, set goals, and optimize your spending with AI-powered insights.",
       gradient: "from-blue-600 via-purple-600 to-indigo-700",
       icon: Wallet

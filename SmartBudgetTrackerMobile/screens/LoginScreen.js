@@ -105,10 +105,10 @@ const LoginScreen = ({ onLogin }) => {
         <Card style={styles.card}>
           <Card.Content>
             <Title style={styles.title}>
-              Welcome to Smart Budget Tracker
+              Welcome to TRIKIA
             </Title>
             <Text style={styles.subtitle}>
-              Enter your details to access your account
+              Your Personal AI Budget Tracker
             </Text>
             
             <TextInput
