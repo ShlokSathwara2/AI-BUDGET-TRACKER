@@ -14,6 +14,8 @@ import BankAccountScreen from './screens/BankAccountScreen';
 import FamilyBudgetScreen from './screens/FamilyBudgetScreen';
 import SavingsGoalScreen from './screens/SavingsGoalScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import PaymentRemindersScreen from './screens/PaymentRemindersScreen';
+import ReportsScreen from './screens/ReportsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -28,6 +30,10 @@ function MainTabs({ user, onLogout }) {
 
           if (route.name === 'Dashboard') {
             iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Reports') {
+            iconName = focused ? 'analytics' : 'analytics-outline';
+          } else if (route.name === 'Reminders') {
+            iconName = focused ? 'notifications' : 'notifications-outline';
           } else if (route.name === 'BankAccounts') {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Transactions') {
@@ -51,6 +57,18 @@ function MainTabs({ user, onLogout }) {
         options={{ title: 'Home' }}
       >
         {props => <DashboardScreen {...props} user={user} onLogout={onLogout} />}
+      </Tab.Screen>
+      <Tab.Screen 
+        name="Reports" 
+        options={{ title: 'Reports' }}
+      >
+        {props => <ReportsScreen {...props} userId={user.id} />}
+      </Tab.Screen>
+      <Tab.Screen 
+        name="Reminders" 
+        options={{ title: 'Reminders' }}
+      >
+        {props => <PaymentRemindersScreen {...props} navigation={props.navigation} userId={user.id} />}
       </Tab.Screen>
       <Tab.Screen 
         name="BankAccounts" 
