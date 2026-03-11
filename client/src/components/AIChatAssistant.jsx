@@ -92,17 +92,19 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
   };
 
   const accountAnalysis = (accountName) => {
-    if (!bankAccounts || bankAccounts.length === 0) {
+    const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
+    
+    if (!safeBankAccounts || safeBankAccounts.length === 0) {
       return "You haven't added any bank accounts yet. Please add your accounts to get detailed analysis.";
     }
     
-    const account = bankAccounts.find(acc => 
-      acc.name.toLowerCase().includes(accountName.toLowerCase()) || 
-      acc.lastFourDigits === accountName
+    const account = safeBankAccounts.find(acc => 
+      acc?.name?.toLowerCase().includes(accountName.toLowerCase()) || 
+      acc?.lastFourDigits === accountName
     );
     
     if (!account) {
-      return `I couldn't find an account matching "${accountName}". Your accounts are: ${bankAccounts.map(acc => acc.name).join(', ')}`;
+      return `I couldn't find an account matching "${accountName}". Your accounts are: ${safeBankAccounts.map(acc => acc?.name || 'Unknown').join(', ')}`;
     }
     
     const accountTransactions = transactions.filter(tx => tx.bankAccountId === account.id);
@@ -194,7 +196,7 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
     return (
       <button
         onClick={() => setIsVisible(true)}
-        className="fixed bottom-6 left-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-2xl hover:from-blue-500 hover:to-purple-500 transition-all duration-300 z-50"
+        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-2xl hover:from-blue-500 hover:to-purple-500 transition-all duration-300 z-50"
       >
         <MessageCircle className="h-6 w-6" />
       </button>

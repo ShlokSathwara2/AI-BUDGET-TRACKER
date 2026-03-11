@@ -17,10 +17,14 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all'); // 'all', 'week', 'month', 'year'
   const [showAmounts, setShowAmounts] = useState(true);
+  
+  // Defensive checks - ensure arrays
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+  const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
 
   // Filter transactions based on search and date
   const filterTransactions = (transactionsToFilter) => {
-    let filtered = transactionsToFilter;
+    let filtered = Array.isArray(transactionsToFilter) ? transactionsToFilter : [];
 
     // Date filtering
     if (dateFilter !== 'all') {
@@ -41,31 +45,43 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
           filterDate = new Date(0);
       }
       
-      filtered = filtered.filter(tx => new Date(tx.date) >= filterDate);
+      filtered = filtered.filter(tx => {
+        try {
+          return new Date(tx?.date || Date.now()) >= filterDate;
+        } catch (e) {
+          return false;
+        }
+      });
     }
 
     // Search filtering
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(tx => 
-        tx.merchant?.toLowerCase().includes(searchLower) ||
-        tx.category?.toLowerCase().includes(searchLower) ||
-        tx.description?.toLowerCase().includes(searchLower) ||
-        tx.amount?.toString().includes(searchTerm)
+        tx?.merchant?.toLowerCase().includes(searchLower) ||
+        tx?.category?.toLowerCase().includes(searchLower) ||
+        tx?.description?.toLowerCase().includes(searchLower) ||
+        tx?.amount?.toString().includes(searchTerm)
       );
     }
 
-    return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return filtered.sort((a, b) => {
+      try {
+        return new Date(b?.date || Date.now()) - new Date(a?.date || Date.now());
+      } catch (e) {
+        return 0;
+      }
+    });
   };
 
   // Get transactions for a specific account
   const getAccountTransactions = (accountId) => {
-    return transactions.filter(tx => tx.bankAccountId === accountId);
+    return safeTransactions.filter(tx => tx?.bankAccountId === accountId);
   };
 
   // Get account by ID
   const getAccountById = (accountId) => {
-    return bankAccounts.find(acc => acc.id === accountId);
+    return safeBankAccounts.find(acc => acc?.id === accountId);
   };
 
   // Format currency
@@ -76,7 +92,7 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
 
   // Get all unique categories
   const getCategories = () => {
-    const categories = [...new Set(transactions.map(tx => tx.category || 'Other'))];
+    const categories = [...new Set(safeTransactions.map(tx => tx?.category || 'Other'))];
     return categories.filter(cat => cat).sort();
   };
 
@@ -121,18 +137,18 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
           All Transactions
         </button>
         
-        {bankAccounts.map(account => (
+        {safeBankAccounts.map(account => (
           <button
-            key={account.id}
-            onClick={() => setActiveView(`account-${account.id}`)}
+            key={account?.id}
+            onClick={() => setActiveView(`account-${account?.id}`)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
-              activeView === `account-${account.id}`
+              activeView === `account-${account?.id}`
                 ? 'bg-green-600 text-white shadow-lg'
                 : 'bg-white/10 text-gray-300 hover:bg-white/20'
             }`}
           >
-            <span>{account.name}</span>
-            <span className="text-xs opacity-75">(****{account.lastFourDigits})</span>
+            <span>{account?.name || 'Unknown'}</span>
+            <span className="text-xs opacity-75">(****{account?.lastFourDigits || ''})</span>
           </button>
         ))}
       </div>
@@ -190,37 +206,46 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
       {/* Transaction List */}
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {activeView === 'all' ? (
-          // All Transactions View
-          filterTransactions(transactions).length > 0 ? (
-            filterTransactions(transactions).map((transaction) => {
-              const account = getAccountById(transaction.bankAccountId);
+          // All Transactions View - FIXED: Use safeTransactions instead of raw transactions prop
+          filterTransactions(safeTransactions).length > 0 ? (
+            filterTransactions(safeTransactions).map((transaction) => {
+              // Safe field access with defaults
+              const txAmount = typeof transaction?.amount === 'number' ? transaction.amount : 0;
+              const txDate = new Date(transaction?.date || transaction?.createdAt || Date.now());
+              const txCategory = transaction?.category || 'Other';
+              const txMerchant = transaction?.merchant || 'Unknown Merchant';
+              const txType = transaction?.type || 'debit';
+              const txId = transaction?._id || transaction?.id || 'unknown';
+              
+              const account = getAccountById(transaction?.bankAccountId);
+              
               return (
                 <motion.div
-                  key={transaction._id || transaction.id || `${transaction.merchant || 'unknown'}-${transaction.date || Date.now()}`}
+                  key={`${txId}`}
                   className="p-4 bg-white/5 rounded-xl border border-white/10 classy-element flex justify-between items-center hover:bg-white/10 transition-colors"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                 >
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-1">
-                      <div className={`p-1 rounded ${transaction.type === 'credit' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                        {transaction.type === 'credit' ? 
+                      <div className={`p-1 rounded ${txType === 'credit' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                        {txType === 'credit' ? 
                           <TrendingUp className="h-3 w-3 text-green-400" /> : 
                           <TrendingDown className="h-3 w-3 text-red-400" />
                         }
                       </div>
-                      <div className="font-medium text-white">{transaction.merchant || 'Unknown Merchant'}</div>
+                      <div className="font-medium text-white">{txMerchant}</div>
                       {account && (
                         <div className="text-xs text-gray-400 bg-white/10 px-2 py-1 rounded">
-                          {account.name} (****{account.lastFourDigits})
+                          {account.name || 'Unknown'} (****{account?.lastFourDigits || ''})
                         </div>
                       )}
                     </div>
                     <div className="flex items-center space-x-4 text-sm text-gray-400">
-                      <span>{transaction.category || 'Other'}</span>
+                      <span>{txCategory}</span>
                       <span>•</span>
-                      <span>{new Date(transaction.date || transaction.createdAt).toLocaleDateString()}</span>
-                      {transaction.description && (
+                      <span>{txDate.toLocaleDateString()}</span>
+                      {transaction?.description && (
                         <>
                           <span>•</span>
                           <span className="truncate max-w-xs">{transaction.description}</span>
@@ -230,8 +255,8 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
                   </div>
                   
                   <div className="flex items-center space-x-3">
-                    <div className={`font-semibold text-lg ${transaction.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
-                      {transaction.type === 'credit' ? '+' : '-'}{formatAmount(transaction.amount)}
+                    <div className={`font-semibold text-lg ${txType === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
+                      {txType === 'credit' ? '+' : '-'}{formatAmount(txAmount)}
                     </div>
                     <div className="flex space-x-1">
                       <button
@@ -244,8 +269,7 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
                       <button
                         onClick={() => {
                           if (window.confirm('Are you sure you want to delete this transaction?')) {
-                            const transactionId = transaction._id || transaction.id || `${transaction.merchant || 'unknown'}-${transaction.date || Date.now()}`;
-                            onDeleteTransaction && onDeleteTransaction(transactionId);
+                            onDeleteTransaction && onDeleteTransaction(txId);
                           }
                         }}
                         className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
@@ -300,64 +324,73 @@ const TransactionSections = ({ transactions = [], bankAccounts = [], onEditTrans
                   </div>
                 </div>
                 
-                {accountTransactions.map((transaction) => (
-                  <motion.div
-                    key={transaction._id || transaction.id || `${transaction.merchant || 'unknown'}-${transaction.date || Date.now()}`}
-                    className="p-4 bg-white/5 rounded-xl border border-white/10 classy-element flex justify-between items-center hover:bg-white/10 transition-colors"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-1">
-                        <div className={`p-1 rounded ${transaction.type === 'credit' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                          {transaction.type === 'credit' ? 
-                            <TrendingUp className="h-3 w-3 text-green-400" /> : 
-                            <TrendingDown className="h-3 w-3 text-red-400" />
-                          }
-                        </div>
-                        <div className="font-medium text-white">{transaction.merchant || 'Unknown Merchant'}</div>
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-gray-400">
-                        <span>{transaction.category || 'Other'}</span>
-                        <span>•</span>
-                        <span>{new Date(transaction.date || transaction.createdAt).toLocaleDateString()}</span>
-                        {transaction.description && (
-                          <>
-                            <span>•</span>
-                            <span className="truncate max-w-xs">{transaction.description}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <div className={`font-semibold text-lg ${transaction.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
-                        {transaction.type === 'credit' ? '+' : '-'}{formatAmount(transaction.amount)}
-                      </div>
-                      <div className="flex space-x-1">
-                        <button
-                          onClick={() => onEditTransaction && onEditTransaction(transaction)}
-                          className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors"
-                          title="Edit transaction"
-                        >
-                          <Hash className="w-4 h-4 text-blue-300" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to delete this transaction?')) {
-                              const transactionId = transaction._id || transaction.id || `${transaction.merchant || 'unknown'}-${transaction.date || Date.now()}`;
-                              onDeleteTransaction && onDeleteTransaction(transactionId);
+                {accountTransactions.map((transaction) => {
+                  // Safe field access with defaults
+                  const txAmount = typeof transaction?.amount === 'number' ? transaction.amount : 0;
+                  const txDate = new Date(transaction?.date || transaction?.createdAt || Date.now());
+                  const txCategory = transaction?.category || 'Other';
+                  const txMerchant = transaction?.merchant || 'Unknown Merchant';
+                  const txType = transaction?.type || 'debit';
+                  const txId = transaction?._id || transaction?.id || 'unknown';
+                  
+                  return (
+                    <motion.div
+                      key={`${txId}`}
+                      className="p-4 bg-white/5 rounded-xl border border-white/10 classy-element flex justify-between items-center hover:bg-white/10 transition-colors"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-1">
+                          <div className={`p-1 rounded ${txType === 'credit' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                            {txType === 'credit' ? 
+                              <TrendingUp className="h-3 w-3 text-green-400" /> : 
+                              <TrendingDown className="h-3 w-3 text-red-400" />
                             }
-                          }}
-                          className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
-                          title="Delete transaction"
-                        >
-                          <TrendingDown className="w-4 h-4 text-red-300" />
-                        </button>
+                          </div>
+                          <div className="font-medium text-white">{txMerchant}</div>
+                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-gray-400">
+                          <span>{txCategory}</span>
+                          <span>•</span>
+                          <span>{txDate.toLocaleDateString()}</span>
+                          {transaction?.description && (
+                            <>
+                              <span>•</span>
+                              <span className="truncate max-w-xs">{transaction.description}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                      
+                      <div className="flex items-center space-x-3">
+                        <div className={`font-semibold text-lg ${txType === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
+                          {txType === 'credit' ? '+' : '-'}{formatAmount(txAmount)}
+                        </div>
+                        <div className="flex space-x-1">
+                          <button
+                            onClick={() => onEditTransaction && onEditTransaction(transaction)}
+                            className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors"
+                            title="Edit transaction"
+                          >
+                            <Hash className="w-4 h-4 text-blue-300" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to delete this transaction?')) {
+                                onDeleteTransaction && onDeleteTransaction(txId);
+                              }
+                            }}
+                            className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
+                            title="Delete transaction"
+                          >
+                            <TrendingDown className="w-4 h-4 text-red-300" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </>
             ) : (
               <div className="text-center py-12">

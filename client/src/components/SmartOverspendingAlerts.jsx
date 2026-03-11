@@ -69,8 +69,10 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
         weeklySpendingHistory.push(weekTotal);
       }
       
-      const avgWeeklySpending = weeklySpendingHistory.length > 0 
-        ? weeklySpendingHistory.reduce((sum, val) => sum + val, 0) / weeklySpendingHistory.length
+      // Safe weekly spending calculation
+      const safeWeeklyHistory = Array.isArray(weeklySpendingHistory) ? weeklySpendingHistory : [];
+      const avgWeeklySpending = safeWeeklyHistory.length > 0 
+        ? safeWeeklyHistory.reduce((sum, val) => sum + val, 0) / safeWeeklyHistory.length
         : 0;
       
       const currentWeeklySpending = weeklyTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
@@ -90,8 +92,10 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
         monthlySpendingHistory.push(monthTotal);
       }
       
-      const avgMonthlySpending = monthlySpendingHistory.length > 0 
-        ? monthlySpendingHistory.reduce((sum, val) => sum + val, 0) / monthlySpendingHistory.length
+      // Safe monthly spending calculation
+      const safeMonthlyHistory = Array.isArray(monthlySpendingHistory) ? monthlySpendingHistory : [];
+      const avgMonthlySpending = safeMonthlyHistory.length > 0 
+        ? safeMonthlyHistory.reduce((sum, val) => sum + val, 0) / safeMonthlyHistory.length
         : 0;
       
       const currentMonthlySpending = monthlyTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
@@ -150,7 +154,8 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
     recentTransactions.forEach(tx => {
       const categoryData = analyzeSpendingPatterns[tx.category];
       if (categoryData && tx.amount > categoryData.avgWeeklySpending * 0.5) { // Purchase > 50% of weekly average for category
-        const avgPerTransaction = categoryData.avgWeeklySpending / Math.max(categoryData.all.length, 1);
+        const safeAllArray = Array.isArray(categoryData.all) ? categoryData.all : [];
+        const avgPerTransaction = categoryData.avgWeeklySpending / Math.max(safeAllArray.length, 1);
         const multiplier = (tx.amount / avgPerTransaction).toFixed(1);
         
         newAlerts.push({

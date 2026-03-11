@@ -12,33 +12,16 @@ const AddTransaction = ({ onAdd, accounts = [] }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Check if there are any bank accounts available
-  const hasAccounts = Array.isArray(accounts) && accounts.length > 0;
+  // Check if there are any bank accounts available - defensive check
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+  const hasAccounts = safeAccounts.length > 0;
 
   const validateForm = () => {
     const newErrors = {};
     
-    // Check if there are any bank accounts available
-    if (!hasAccounts && paymentMethod !== 'cash') {
-      newErrors.general = 'Please add at least one bank account before adding transactions.';
-      setErrors(newErrors);
-      return false;
-    }
-    
+    // Only validate amount and payment method - let users enter any other values
     if (!amount || parseFloat(amount) <= 0) {
       newErrors.amount = 'Amount must be greater than 0';
-    }
-    
-    if (!merchant.trim()) {
-      newErrors.merchant = 'Merchant is required';
-    }
-    
-    if (!description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    
-    if (!bankAccount && paymentMethod !== 'cash') {
-      newErrors.bankAccount = 'Bank account is required';
     }
     
     if (!paymentMethod) {
@@ -62,16 +45,16 @@ const AddTransaction = ({ onAdd, accounts = [] }) => {
     
     setLoading(true);
     try {
-      // Validate all required fields
-      if (!amount || !merchant.trim() || !description.trim() || !paymentMethod) {
-        throw new Error('Missing required fields');
+      // Validate amount only - other fields are optional now
+      if (!amount || parseFloat(amount) <= 0) {
+        throw new Error('Amount must be greater than 0');
       }
 
       const newTransaction = {
         amount: parseFloat(amount),
-        merchant: merchant.trim(),
-        description: description.trim(),
-        category: category.trim() || 'Other',
+        merchant: merchant.trim() || 'Unknown',
+        description: description.trim() || '',
+        category: category.trim() || 'Uncategorized',
         type: 'debit',
         currency: 'INR',
         date: new Date().toISOString(),
@@ -127,6 +110,16 @@ const AddTransaction = ({ onAdd, accounts = [] }) => {
 
   const inputFields = [
     {
+      id: 'bankAccount',
+      label: 'Bank Account',
+      value: bankAccount,
+      onChange: setBankAccount,
+      icon: Wallet,
+      type: 'select',
+      error: errors.bankAccount,
+      options: [{ value: '', label: 'Select Account' }, ...getAccountOptions()]
+    },
+    {
       id: 'amount',
       label: 'Amount (₹)',
       value: amount,
@@ -161,16 +154,6 @@ const AddTransaction = ({ onAdd, accounts = [] }) => {
       onChange: setCategory,
       placeholder: 'Food, Transport, Shopping, etc.',
       icon: Tag
-    },
-    {
-      id: 'bankAccount',
-      label: 'Bank Account',
-      value: bankAccount,
-      onChange: setBankAccount,
-      icon: Wallet,
-      type: 'select',
-      error: errors.bankAccount,
-      options: [{ value: '', label: 'Select Account' }, ...getAccountOptions()]
     },
     {
       id: 'paymentMethod',
@@ -208,7 +191,7 @@ const AddTransaction = ({ onAdd, accounts = [] }) => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {inputFields.map((field) => (
             <div key={field.id} className="space-y-3">

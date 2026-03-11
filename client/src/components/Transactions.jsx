@@ -8,22 +8,26 @@ const Transactions = ({ transactions = [], bankAccounts = [] }) => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedAccountId, setSelectedAccountId] = useState('all'); // 'all' for all transactions, or specific account id
   const [viewMode, setViewMode] = useState('all'); // 'all' for all transactions, 'account' for specific account
+  
+  // Defensive check - ensure transactions is always an array
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+  const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
 
   // Get unique categories for filter dropdown
   const categories = useMemo(() => {
-    const allCategories = transactions
-      .map(tx => tx.category || 'Uncategorized')
+    const allCategories = safeTransactions
+      .map(tx => (tx?.category || 'Uncategorized'))
       .filter(cat => cat && cat.trim() !== '');
     return ['Uncategorized', ...Array.from(new Set(allCategories))];
-  }, [transactions]);
+  }, [safeTransactions]);
 
   // Filter transactions based on selected filters and account
   const filteredTransactions = useMemo(() => {
-    let filtered = [...transactions];
+    let filtered = [...safeTransactions];
 
     // Apply account filter if specific account is selected
     if (selectedAccountId !== 'all') {
-      filtered = filtered.filter(tx => tx.bankAccountId === selectedAccountId);
+      filtered = filtered.filter(tx => tx?.bankAccountId === selectedAccountId);
     }
 
     // Apply date filter
@@ -46,26 +50,26 @@ const Transactions = ({ transactions = [], bankAccounts = [] }) => {
       }
 
       filtered = filtered.filter(tx => {
-        const txDate = new Date(tx.date);
+        const txDate = new Date(tx?.date || Date.now());
         return txDate >= startDate && txDate <= now;
       });
     }
 
     // Apply type filter
     if (typeFilter !== 'all') {
-      filtered = filtered.filter(tx => tx.type === typeFilter);
+      filtered = filtered.filter(tx => tx?.type === typeFilter);
     }
 
     // Apply category filter
     if (categoryFilter !== 'all') {
-      filtered = filtered.filter(tx => (tx.category || 'Uncategorized') === categoryFilter);
+      filtered = filtered.filter(tx => (tx?.category || 'Uncategorized') === categoryFilter);
     }
 
     // Sort by date (newest first)
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    filtered.sort((a, b) => new Date(b?.date || Date.now()) - new Date(a?.date || Date.now()));
 
     return filtered;
-  }, [transactions, selectedAccountId, filter, typeFilter, categoryFilter]);
+  }, [safeTransactions, selectedAccountId, filter, typeFilter, categoryFilter]);
 
   // Group transactions by date
   const groupedTransactions = useMemo(() => {
@@ -86,28 +90,33 @@ const Transactions = ({ transactions = [], bankAccounts = [] }) => {
 
   // Get date string in readable format
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        return date.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid Date';
     }
   };
 
   // Get account name by ID
   const getAccountName = (accountId) => {
-    const account = bankAccounts.find(acc => acc.id === accountId);
+    const account = safeBankAccounts.find(acc => acc?.id === accountId);
     return account ? account.name : 'Unknown Account';
   };
 
@@ -126,8 +135,8 @@ const Transactions = ({ transactions = [], bankAccounts = [] }) => {
   // Get selected account details if in account view mode
   const selectedAccountDetails = useMemo(() => {
     if (selectedAccountId === 'all') return null;
-    return bankAccounts.find(acc => acc.id === selectedAccountId);
-  }, [selectedAccountId, bankAccounts]);
+    return safeBankAccounts.find(acc => acc?.id === selectedAccountId);
+  }, [selectedAccountId, safeBankAccounts]);
 
   return (
     <div className="space-y-6">
@@ -181,9 +190,9 @@ const Transactions = ({ transactions = [], bankAccounts = [] }) => {
               className="w-full px-4 py-3 bg-black/30 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
             >
               <option value="all">All Accounts</option>
-              {bankAccounts.map(account => (
-                <option key={account.id} value={account.id}>
-                  {account.name} {account.lastFourDigits ? `(****${account.lastFourDigits})` : ''}
+              {safeBankAccounts.map(account => (
+                <option key={account?.id} value={account?.id}>
+                  {account?.name || 'Unknown'} {account?.lastFourDigits ? `(****${account.lastFourDigits})` : ''}
                 </option>
               ))}
             </select>
@@ -242,7 +251,7 @@ const Transactions = ({ transactions = [], bankAccounts = [] }) => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-lg font-semibold text-white">{selectedAccountDetails.name}</h3>
-              <p className="text-gray-400">Current Balance: ₹{selectedAccountDetails.balance?.toLocaleString() || 'N/A'}</p>
+              <p className="text-gray-400">Current Balance: ₹{(typeof selectedAccountDetails?.balance === 'number' ? selectedAccountDetails.balance : 0).toLocaleString()}</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-400">Account Number</p>
@@ -313,67 +322,76 @@ const Transactions = ({ transactions = [], bankAccounts = [] }) => {
               </div>
               
               <div className="space-y-2">
-                {groupedTransactions[date].map((transaction, index) => (
-                  <motion.div
-                    key={`${transaction._id}-${index}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.2, delay: index * 0.05 }}
-                    className={`p-4 bg-white/5 rounded-xl border-l-4 ${
-                      transaction.type === 'credit' 
-                        ? 'border-green-500' 
-                        : 'border-red-500'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`p-2 rounded-lg ${
-                          transaction.type === 'credit' 
-                            ? 'bg-green-500/20' 
-                            : 'bg-red-500/20'
-                        }`}>
-                          {transaction.type === 'credit' ? (
-                            <TrendingUp className="h-5 w-5 text-green-400" />
-                          ) : (
-                            <TrendingDown className="h-5 w-5 text-red-400" />
-                          )}
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-medium text-white">
-                            {transaction.merchant || transaction.description || 'Untitled'}
-                          </h4>
-                          <div className="flex items-center space-x-2 text-sm text-gray-400">
-                            <span>{transaction.description}</span>
-                            {transaction.bankAccountId && (
-                              <>
-                                <span>•</span>
-                                <span>{getAccountName(transaction.bankAccountId)}</span>
-                              </>
+                {groupedTransactions[date].map((transaction, index) => {
+                  // Ensure all fields are safe to access
+                  const txAmount = typeof transaction?.amount === 'number' ? transaction.amount : 0;
+                  const txDate = new Date(transaction?.date || Date.now());
+                  const txCategory = transaction?.category || 'Uncategorized';
+                  const txMerchant = transaction?.merchant || transaction?.description || 'Untitled';
+                  const txType = transaction?.type || 'debit';
+                  
+                  return (
+                    <motion.div
+                      key={`${transaction?._id || transaction?.id || index}-${index}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                      className={`p-4 bg-white/5 rounded-xl border-l-4 ${
+                        txType === 'credit' 
+                          ? 'border-green-500' 
+                          : 'border-red-500'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className={`p-2 rounded-lg ${
+                            txType === 'credit' 
+                              ? 'bg-green-500/20' 
+                              : 'bg-red-500/20'
+                          }`}>
+                            {txType === 'credit' ? (
+                              <TrendingUp className="h-5 w-5 text-green-400" />
+                            ) : (
+                              <TrendingDown className="h-5 w-5 text-red-400" />
                             )}
                           </div>
-                          <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
-                            <Tag className="h-3 w-3" />
-                            <span>{transaction.category || 'Uncategorized'}</span>
-                            <span>•</span>
-                            <span>{new Date(transaction.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          
+                          <div>
+                            <h4 className="font-medium text-white">
+                              {txMerchant}
+                            </h4>
+                            <div className="flex items-center space-x-2 text-sm text-gray-400">
+                              <span>{transaction?.description || ''}</span>
+                              {transaction?.bankAccountId && (
+                                <>
+                                  <span>•</span>
+                                  <span>{getAccountName(transaction.bankAccountId)}</span>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                              <Tag className="h-3 w-3" />
+                              <span>{txCategory}</span>
+                              <span>•</span>
+                              <span>{txDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
                           </div>
                         </div>
+                        
+                        <div className="text-right">
+                          <p className={`font-semibold ${
+                            txType === 'credit' 
+                              ? 'text-green-400' 
+                              : 'text-red-400'
+                          }`}>
+                            {txType === 'credit' ? '+' : '-'}₹{txAmount.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">{transaction?.paymentMethod || ''}</p>
+                        </div>
                       </div>
-                      
-                      <div className="text-right">
-                        <p className={`font-semibold ${
-                          transaction.type === 'credit' 
-                            ? 'text-green-400' 
-                            : 'text-red-400'
-                        }`}>
-                          {transaction.type === 'credit' ? '+' : '-'}₹{transaction.amount?.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">{transaction.paymentMethod}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           ))

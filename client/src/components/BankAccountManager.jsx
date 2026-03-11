@@ -208,7 +208,7 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
       {/* Bank Account List */}
       <div className="space-y-4">
         <AnimatePresence>
-          {accounts.length === 0 ? (
+          {Array.isArray(accounts) && accounts.length === 0 ? (
             <motion.div
               className="text-center py-10"
               initial={{ opacity: 0 }}

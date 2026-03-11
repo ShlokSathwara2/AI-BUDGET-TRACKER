@@ -73,16 +73,17 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
       doc.text(`Net Balance: ₹${netBalance.toLocaleString()}`, 20, 130);
       
       // Add transaction count
-      doc.text(`Total Transactions: ${transactions.length}`, 20, 140);
+      const safeTxCount = Array.isArray(transactions) ? transactions.length : 0;
+      doc.text(`Total Transactions: ${safeTxCount}`, 20, 140);
       
       // Add transactions (up to 20 to fit on page)
-      if (transactions.length > 0) {
+      if (safeTxCount > 0) {
         doc.setFontSize(16);
         doc.text('Recent Transactions', 20, 160);
         doc.setFontSize(10);
         
         let yPos = 170;
-        for (let i = 0; i < Math.min(transactions.length, 20); i++) {
+        for (let i = 0; i < Math.min(safeTxCount, 20); i++) {
           const tx = transactions[i];
           const typeColor = tx.type === 'credit' ? [0, 128, 0] : [255, 0, 0]; // Green for credit, red for debit
           

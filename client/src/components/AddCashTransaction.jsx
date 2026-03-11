@@ -21,8 +21,9 @@ const AddCashTransaction = ({ onAdd, accounts = [] }) => {
   const [loading, setLoading] = useState(false);
   const [transactionErrors, setTransactionErrors] = useState({});
 
-  // Check if there are any bank accounts available
-  const hasAccounts = Array.isArray(accounts) && accounts.length > 0;
+  // Defensive check - ensure accounts is always an array
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+  const hasAccounts = safeAccounts.length > 0;
 
   // Validate bank account form
   const validateAccountForm = () => {
@@ -56,31 +57,12 @@ const AddCashTransaction = ({ onAdd, accounts = [] }) => {
     setAccountErrors({});
   };
 
-  // Validate transaction form
+  // Validate transaction form - only amount and payment method required
   const validateTransactionForm = () => {
     const newErrors = {};
     
-    // Check if there are any bank accounts available
-    if (!hasAccounts && paymentMethod !== 'cash') {
-      newErrors.general = 'Please add at least one bank account before adding transactions.';
-      setTransactionErrors(newErrors);
-      return false;
-    }
-    
     if (!amount || parseFloat(amount) <= 0) {
       newErrors.amount = 'Amount must be greater than 0';
-    }
-    
-    if (!merchant.trim()) {
-      newErrors.merchant = 'Merchant is required';
-    }
-    
-    if (!description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    
-    if (!bankAccount && paymentMethod !== 'cash') {
-      newErrors.bankAccount = 'Bank account is required';
     }
     
     if (!paymentMethod) {
@@ -100,15 +82,15 @@ const AddCashTransaction = ({ onAdd, accounts = [] }) => {
     
     setLoading(true);
     try {
-      // Validate all required fields
-      if (!amount || !merchant.trim() || !description.trim() || !paymentMethod) {
-        throw new Error('Missing required fields');
+      // Validate amount only - other fields are optional now
+      if (!amount || parseFloat(amount) <= 0) {
+        throw new Error('Amount must be greater than 0');
       }
 
       const newTransaction = {
         amount: parseFloat(amount),
-        merchant: merchant.trim(),
-        description: description.trim(),
+        merchant: merchant.trim() || 'Unknown',
+        description: description.trim() || '',
         category: category.trim() || 'Other',
         type: 'debit',
         currency: 'INR',

@@ -12,33 +12,16 @@ const AddCreditTransaction = ({ onAdd, accounts = [] }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Check if there are any bank accounts available
-  const hasAccounts = Array.isArray(accounts) && accounts.length > 0;
+  // Defensive check - ensure accounts is always an array
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+  const hasAccounts = safeAccounts.length > 0;
 
   const validateForm = () => {
     const newErrors = {};
     
-    // Check if there are any bank accounts available
-    if (!hasAccounts && paymentMethod !== 'cash') {
-      newErrors.general = 'Please add at least one bank account before adding transactions.';
-      setErrors(newErrors);
-      return false;
-    }
-    
+    // Only validate amount and payment method - let users enter any other values
     if (!amount || parseFloat(amount) <= 0) {
       newErrors.amount = 'Amount must be greater than 0';
-    }
-    
-    if (!merchant.trim()) {
-      newErrors.merchant = 'Source is required';
-    }
-    
-    if (!description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    
-    if (!bankAccount && paymentMethod !== 'cash') {
-      newErrors.bankAccount = 'Bank account is required';
     }
     
     if (!paymentMethod) {
@@ -62,15 +45,15 @@ const AddCreditTransaction = ({ onAdd, accounts = [] }) => {
     
     setLoading(true);
     try {
-      // Validate all required fields
-      if (!amount || !merchant.trim() || !description.trim() || !paymentMethod) {
-        throw new Error('Missing required fields');
+      // Validate amount only - other fields are optional now
+      if (!amount || parseFloat(amount) <= 0) {
+        throw new Error('Amount must be greater than 0');
       }
 
       const newTransaction = {
         amount: parseFloat(amount),
-        merchant: merchant.trim(),
-        description: description.trim(),
+        merchant: merchant.trim() || 'Unknown',
+        description: description.trim() || '',
         category: category.trim() || 'Income',
         type: 'credit',
         currency: 'INR',

@@ -1,6 +1,61 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Wallet, User, BarChart3, FileText, Settings, Home, LogOut, Sun, Moon, Calculator, AlertTriangle, MessageSquare, PiggyBank, Edit3, Trash2, Users } from 'lucide-react';
+
+// Toast notification state - replaces blocking alert() calls
+let globalSetToast = null; // Will be set by AppContent component
+
+// Error Boundary Component to catch and display errors
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', color: 'red', backgroundColor: '#1a0000', borderRadius: '8px', margin: '1rem' }}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>⚠️ Something went wrong:</h2>
+          <pre style={{ 
+            backgroundColor: '#330000', 
+            padding: '1rem', 
+            borderRadius: '4px', 
+            overflow: 'auto',
+            color: '#ff6b6b',
+            fontFamily: 'monospace',
+            fontSize: '0.9rem'
+          }}>
+            {this.state.error?.message || 'Unknown error occurred'}
+          </pre>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '1rem',
+              padding: '0.5rem 1rem',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import SummaryCards from './components/SummaryCards';
 import AddTransaction from './components/AddTransaction';
 import AddCreditTransaction from './components/AddCreditTransaction';
@@ -265,12 +320,14 @@ const Navbar = ({ activeTab, setActiveTab, user, onLogout }) => {
 // Main App Component with Theme and Notification Providers
 function App() {
   return (
-    <NotificationProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
-      <NotificationDisplay />
-    </NotificationProvider>
+    <ErrorBoundary>
+      <NotificationProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+        <NotificationDisplay />
+      </NotificationProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -288,8 +345,24 @@ function AppContent() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [isChatVisible, setIsChatVisible] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const { isDarkMode } = useTheme();
+
+  // Initialize global toast reference for use outside components
+  useEffect(() => {
+    globalSetToast = setToast;
+  }, []);
+
+  // Auto-hide toast after delay
+  useEffect(() => {
+    if (toast.show) {
+      const timer = setTimeout(() => {
+        setToast(prev => ({ ...prev, show: false }));
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.show]);
 
   // Load user-specific settings
   const loadUserSettings = () => {
@@ -438,9 +511,10 @@ function AppContent() {
       setLoading(true);
       try {
         const data = await getTransactions();
-        // Filter transactions by user if user data is available
-        const userTransactions = user && data.filter(tx => tx.user === user.id);
-        setTransactions(Array.isArray(userTransactions) ? userTransactions : []);
+        // Filter transactions by user if user data is available - SAFE version
+        const allData = Array.isArray(data) ? data : [];
+        const userTransactions = user ? allData.filter(tx => tx?.user === user.id) : allData;
+        setTransactions(userTransactions);
       } catch (err) {
         console.error('Error loading transactions:', err);
         // Load user-specific transactions from localStorage
@@ -463,33 +537,47 @@ function AppContent() {
       // Validate required inputs
       if (!newTx) {
         console.error('No transaction data provided');
-        alert('Error: No transaction data provided. Please try again.');
+        setToast({ show: true, message: '❌ Error: No transaction data provided', type: 'error' });
         return;
       }
       
       if (!user) {
         console.error('No user authenticated');
-        alert('Error: Please log in first before adding transactions.');
+        setToast({ show: true, message: '❌ Please log in first', type: 'error' });
         return;
       }
       
       if (!user.id) {
         console.error('User ID missing');
-        alert('Error: User ID missing. Please refresh the page and log in again.');
+        setToast({ show: true, message: '❌ User ID missing. Please refresh and login again.', type: 'error' });
         return;
       }
 
-      // Add user ID and timestamp
+      // Ensure amount is a valid number
+      const amount = parseFloat(newTx.amount) || 0;
+      if (amount <= 0) {
+        setToast({ show: true, message: '❌ Amount must be greater than 0', type: 'error' });
+        return;
+      }
+
+      // Add user ID and timestamp with fallbacks for empty fields
       const transactionWithUser = {
         ...newTx,
         user: user.id,
         _id: Date.now().toString(),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        date: newTx.date || new Date().toISOString(),
+        amount: amount,
+        merchant: newTx.merchant || 'Unknown',        // ← fallback
+        description: newTx.description || '',          // ← fallback  
+        category: newTx.category || 'Uncategorized',   // ← fallback
+        type: newTx.type || 'debit',                   // ← fallback
+        paymentMethod: newTx.paymentMethod || 'cash'   // ← fallback
       };
       
       console.log('Transaction with user data:', transactionWithUser);
       
-      // Update transactions state
+      // Update transactions state - ensure we always work with arrays
       setTransactions(prev => {
         const currentTransactions = Array.isArray(prev) ? prev : [];
         console.log('Previous transactions:', prev);
@@ -506,22 +594,25 @@ function AppContent() {
         console.log('Saved to localStorage successfully');
       } catch (storageError) {
         console.error('Error saving to localStorage:', storageError);
-        alert('Warning: Transaction saved temporarily but failed to save permanently.');
+        setToast({ show: true, message: '⚠️ Saved temporarily but failed to save permanently', type: 'warning' });
       }
       
       // Update bank account balance if account selected and not cash transaction
-      if (transactionWithUser.bankAccountId && Array.isArray(bankAccounts) && bankAccounts.length > 0 && transactionWithUser.mode !== 'cash') {
+      // Defensive check: ensure bankAccounts is an array
+      const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
+      
+      if (transactionWithUser.bankAccountId && safeBankAccounts.length > 0 && transactionWithUser.mode !== 'cash') {
         try {
-          const amount = transactionWithUser.type === 'credit' 
-            ? (transactionWithUser.amount || 0)
-            : -(transactionWithUser.amount || 0);
+          const amountChange = transactionWithUser.type === 'credit' 
+            ? amount
+            : -amount;
           
-          const updatedAccounts = bankAccounts.map(acc => {
+          const updatedAccounts = safeBankAccounts.map(acc => {
             if (acc && acc.id === transactionWithUser.bankAccountId) {
               const currentBalance = typeof acc.balance === 'number' ? acc.balance : 0;
               return { 
                 ...acc, 
-                balance: currentBalance + amount 
+                balance: currentBalance + amountChange 
               };
             }
             return acc;
@@ -548,7 +639,12 @@ function AppContent() {
       
       // Send notification for cross-verification
       const notificationTitle = `New ${transactionWithUser.type === 'credit' ? 'Credit' : 'Debit'} Entry`;
-      const notificationMessage = `Transaction: ${transactionWithUser.merchant || transactionWithUser.description || 'N/A'}\nAmount: ₹${transactionWithUser.amount?.toLocaleString() || '0'}\nCategory: ${transactionWithUser.category || 'Uncategorized'}\nAccount: ${(bankAccounts.find(acc => acc.id === transactionWithUser.bankAccountId)?.name) || 'N/A'}`;
+      const safeBankAccountsForNotif = Array.isArray(bankAccounts) ? bankAccounts : [];
+      const accountName = safeBankAccountsForNotif.length > 0 && transactionWithUser.bankAccountId
+        ? (safeBankAccountsForNotif.find(acc => acc.id === transactionWithUser.bankAccountId)?.name || 'N/A')
+        : 'N/A';
+      
+      const notificationMessage = `Transaction: ${transactionWithUser.merchant || transactionWithUser.description || 'N/A'}\nAmount: ₹${amount.toLocaleString()}\nCategory: ${transactionWithUser.category}\nAccount: ${accountName}`;
       
       // Create notification
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -569,13 +665,17 @@ function AppContent() {
         });
       }
       
-      // Show in-app notification as well
-      alert(`✅ Transaction added successfully!\n\n${notificationTitle}\n${notificationMessage}`);
+      // Show success toast - replaces blocking alert()
+      setToast({ 
+        show: true, 
+        message: `✅ ${transactionWithUser.type === 'credit' ? 'Income' : 'Expense'} of ₹${amount.toLocaleString()} added!`,
+        type: 'success'
+      });
       
     } catch (err) {
       console.error('Error in handleAddTransaction:', err);
       console.error('Error stack:', err.stack);
-      alert('Failed to add transaction: ' + (err.message || 'Unknown error occurred. Please try again.'));
+      setToast({ show: true, message: '❌ Failed to add: ' + (err.message || 'Unknown error'), type: 'error' });
     }
   };
 
@@ -583,7 +683,7 @@ function AppContent() {
   const handleUpdateTransaction = async (updatedTx) => {
     try {
       if (!user || !user.id) {
-        alert('Error: Please log in first before updating transactions.');
+        setToast({ show: true, message: '❌ Please log in first', type: 'error' });
         return;
       }
 
@@ -605,7 +705,7 @@ function AppContent() {
         setTransactions(updatedTransactions);
       } catch (storageError) {
         console.error('Error updating transaction in localStorage:', storageError);
-        alert('Warning: Transaction updated temporarily but failed to save permanently.');
+        setToast({ show: true, message: '⚠️ Saved temporarily but failed to save permanently', type: 'warning' });
       }
 
       // Update bank account balances
@@ -649,10 +749,10 @@ function AppContent() {
         }
       }
 
-      alert('✅ Transaction updated successfully!');
+      setToast({ show: true, message: '✅ Transaction updated!', type: 'success' });
     } catch (err) {
       console.error('Error updating transaction:', err);
-      alert('Failed to update transaction: ' + err.message);
+      setToast({ show: true, message: '❌ Failed to update: ' + err.message, type: 'error' });
     }
   };
 
@@ -660,7 +760,7 @@ function AppContent() {
   const handleDeleteTransaction = async (transactionId) => {
     try {
       if (!user || !user.id) {
-        alert('Error: Please log in first before deleting transactions.');
+        setToast({ show: true, message: '❌ Please log in first', type: 'error' });
         return;
       }
 
@@ -680,7 +780,7 @@ function AppContent() {
         setTransactions(updatedTransactions);
       } catch (storageError) {
         console.error('Error deleting transaction from localStorage:', storageError);
-        alert('Warning: Transaction deleted temporarily but failed to remove permanently.');
+        setToast({ show: true, message: '⚠️ Deleted temporarily but failed to remove permanently', type: 'warning' });
       }
 
       // Update bank account balance to reverse the transaction
@@ -716,10 +816,10 @@ function AppContent() {
         }
       }
 
-      alert('✅ Transaction deleted successfully!');
+      setToast({ show: true, message: '✅ Transaction deleted!', type: 'success' });
     } catch (err) {
       console.error('Error deleting transaction:', err);
-      alert('Failed to delete transaction: ' + err.message);
+      setToast({ show: true, message: '❌ Failed to delete: ' + err.message, type: 'error' });
     }
   };
 
@@ -763,21 +863,24 @@ function AppContent() {
         />;
       case 'dashboard':
       default:
+        // Create safe transactions array to prevent crashes
+        const safeTransactions = Array.isArray(transactions) ? transactions : [];
+        
         return (
           <>
-            <WeeklyReportScheduler user={user} transactions={transactions} settings={userSettings.notifications} />
-            <DailyExpenseReminder user={user} transactions={transactions} settings={userSettings.notifications} />
+            <WeeklyReportScheduler user={user} transactions={safeTransactions} settings={userSettings.notifications} />
+            <DailyExpenseReminder user={user} transactions={safeTransactions} settings={userSettings.notifications} />
             {/* Dashboard Header */}
             <div className="text-center py-8 animate-elegant-entrance">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent mb-4">
-                {transactions.length === 0 ? 'Welcome to AI Budget Tracker!' : `Hello, ${user.name}!`}
+                {safeTransactions.length === 0 ? 'Welcome to AI Budget Tracker!' : `Hello, ${user.name}!`}
               </h1>
               <p className="text-gray-300 text-lg max-w-2xl mx-auto">
-                {transactions.length === 0 
+                {safeTransactions.length === 0 
                   ? 'Get started by adding your first transaction below' 
                   : 'Continue tracking your expenses with your personalized AI Budget Tracker'}
               </p>
-              {transactions.length === 0 && (
+              {safeTransactions.length === 0 && (
                 <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg max-w-md mx-auto">
                   <p className="text-blue-300 text-sm">
                     <span className="font-semibold">New user:</span> Your balance is initialized to zero. Add your first transaction to get started!
@@ -787,7 +890,7 @@ function AppContent() {
             </div>
 
             {/* Summary Cards */}
-            <SummaryCards transactions={transactions} />
+            <SummaryCards transactions={safeTransactions} />
 
             {/* Main Content Grid - Restructured Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -857,7 +960,7 @@ function AppContent() {
               {/* Middle Column - All Transactions Section */}
               <div className="space-y-8">
                 <TransactionSections 
-                  transactions={transactions}
+                  transactions={safeTransactions}
                   bankAccounts={bankAccounts}
                   onEditTransaction={(transaction) => {
                     setSelectedTransaction(transaction);
@@ -866,15 +969,15 @@ function AppContent() {
                   onDeleteTransaction={handleDeleteTransaction}
                 />
                 
-                <SavingPlanner transactions={transactions} />
+                <SavingPlanner transactions={safeTransactions} />
                 
-                <PredictionCard transactions={transactions} />
+                <PredictionCard transactions={safeTransactions} />
               </div>
 
               {/* Right Column - Overspending Section */}
               <div className="space-y-8">
                 <SmartOverspendingAlerts 
-                  transactions={transactions}
+                  transactions={safeTransactions}
                   user={user}
                 />
                 
@@ -913,6 +1016,17 @@ function AppContent() {
           user={user}
           onLogout={handleLogout}
         />
+
+        {/* Toast Notification - Replaces blocking alert() */}
+        {toast.show && (
+          <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-lg transition-all animate-slide-down ${
+            toast.type === 'success' ? 'bg-green-600' :
+            toast.type === 'error' ? 'bg-red-600' :
+            'bg-yellow-600'
+          }`}>
+            <p className="text-white font-medium">{toast.message}</p>
+          </div>
+        )}
 
         <main className="max-w-7xl mx-auto p-6">
           {renderActiveTab()}

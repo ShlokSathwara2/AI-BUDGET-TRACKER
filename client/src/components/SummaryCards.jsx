@@ -3,19 +3,22 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 
 const SummaryCards = ({ transactions = [] }) => {
+  // Defensive check - ensure transactions is always an array
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+  
   // Handle empty transactions case
-  const hasTransactions = transactions.length > 0;
+  const hasTransactions = safeTransactions.length > 0;
   
   const total = hasTransactions 
-    ? transactions.reduce((s, t) => s + (t.amount || 0), 0)
+    ? safeTransactions.reduce((s, t) => s + (t.amount || 0), 0)
     : 0;
     
   const spending = hasTransactions
-    ? transactions.filter(t => t.type !== 'credit').reduce((s, t) => s + (t.amount || 0), 0)
+    ? safeTransactions.filter(t => t.type !== 'credit').reduce((s, t) => s + (t.amount || 0), 0)
     : 0;
     
   const income = hasTransactions
-    ? transactions.filter(t => t.type === 'credit').reduce((s, t) => s + (t.amount || 0), 0)
+    ? safeTransactions.filter(t => t.type === 'credit').reduce((s, t) => s + (t.amount || 0), 0)
     : 0;
     
   // Calculate net balance properly

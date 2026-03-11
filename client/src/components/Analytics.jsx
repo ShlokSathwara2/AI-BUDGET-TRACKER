@@ -532,7 +532,8 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
           </div>
         </div>
 
-        {bankAccounts.length === 0 ? (
+        {/* Safe check for bank accounts */}
+        {Array.isArray(bankAccounts) && bankAccounts.length === 0 ? (
           <div className="text-center py-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl">
             <Wallet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-white mb-2">No Bank Accounts</h3>
@@ -540,7 +541,7 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
           </div>
         ) : (
           <div className="space-y-4">
-            {bankAccounts.map((account, index) => {
+            {Array.isArray(bankAccounts) && bankAccounts.map((account, index) => {
               // Calculate account metrics
               const accountTransactions = transactions.filter(tx => 
                 tx && tx.bankAccountId === account.id
