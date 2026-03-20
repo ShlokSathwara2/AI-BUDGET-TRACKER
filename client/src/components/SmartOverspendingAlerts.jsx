@@ -5,6 +5,7 @@ import { AlertTriangle, TrendingUp, TrendingDown, Bell, Wallet, Target, Clock } 
 const SmartOverspendingAlerts = ({ transactions = [], user }) => {
   const [alerts, setAlerts] = useState([]);
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
+  const [notifiedCategories, setNotifiedCategories] = useState({});
 
   // Calculate spending baselines and detect anomalies
   const analyzeSpendingPatterns = useMemo(() => {
@@ -118,31 +119,45 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
     if (!user || !transactions || transactions.length === 0) return;
 
     const newAlerts = [];
+    const currentDate = new Date();
+    const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
 
     // Check for category-wise weekly anomalies
     Object.entries(analyzeSpendingPatterns).forEach(([category, data]) => {
       if (data.weeklyAnomaly && data.currentWeeklySpending > 0) {
         const multiplier = (data.currentWeeklySpending / data.avgWeeklySpending).toFixed(1);
-        newAlerts.push({
-          id: `weekly-${category}-${Date.now()}`,
-          type: 'warning',
-          title: `High spending detected`,
-          message: `You spent ${multiplier}× more on ${category} this week compared to your average.`,
-          timestamp: new Date().toISOString(),
-          severity: 'high'
-        });
+        const notificationKey = `weekly-${category}-${currentMonthKey}`;
+        
+        // Only send notification once per month
+        if (!notifiedCategories[notificationKey]) {
+          newAlerts.push({
+            id: `weekly-${category}-${Date.now()}`,
+            type: 'warning',
+            title: `High spending detected`,
+            message: `You spent ${multiplier}× more on ${category} this week compared to your average.`,
+            timestamp: new Date().toISOString(),
+            severity: 'high',
+            notificationKey
+          });
+        }
       }
 
       if (data.monthlyAnomaly && data.currentMonthlySpending > 0) {
         const multiplier = (data.currentMonthlySpending / data.avgMonthlySpending).toFixed(1);
-        newAlerts.push({
-          id: `monthly-${category}-${Date.now()}`,
-          type: 'warning',
-          title: `Monthly budget concern`,
-          message: `Your ${category} spending this month is ${multiplier}× higher than usual.`,
-          timestamp: new Date().toISOString(),
-          severity: 'medium'
-        });
+        const notificationKey = `monthly-${category}-${currentMonthKey}`;
+        
+        // Only send notification once per month
+        if (!notifiedCategories[notificationKey]) {
+          newAlerts.push({
+            id: `monthly-${category}-${Date.now()}`,
+            type: 'warning',
+            title: `Monthly budget concern`,
+            message: `Your ${category} spending this month is ${multiplier}× higher than usual.`,
+            timestamp: new Date().toISOString(),
+            severity: 'medium',
+            notificationKey
+          });
+        }
       }
     });
 
@@ -174,6 +189,19 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
       const combined = [...prev, ...newAlerts].slice(-10);
       return combined;
     });
+    
+    // Update notified categories to prevent duplicate notifications this month
+    if (newAlerts.length > 0) {
+      setNotifiedCategories(prev => {
+        const updated = { ...prev };
+        newAlerts.forEach(alert => {
+          if (alert.notificationKey) {
+            updated[alert.notificationKey] = true;
+          }
+        });
+        return updated;
+      });
+    }
   }, [analyzeSpendingPatterns, transactions, user]);
 
   const dismissAlert = (alertId) => {

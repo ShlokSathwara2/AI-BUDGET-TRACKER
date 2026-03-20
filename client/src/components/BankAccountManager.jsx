@@ -1,190 +1,89 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, CreditCard, X, Wallet } from 'lucide-react';
 
-const BankAccountManager = ({ user, onUpdateAccounts }) => {
-  const [accounts, setAccounts] = useState([]);
+/**
+ * FULLY CONTROLLED — no internal `accounts` state.
+ * The parent (App via useAppData) owns the accounts array and persists it.
+ *
+ * Props:
+ *   accounts       : array  — live accounts from App state
+ *   onAdd(obj)     : called when user adds a new account
+ *   onDelete(id)   : called when user deletes an account
+ *   onReset()      : called when user resets all accounts
+ *
+ * Why this matters: the old version had its own useState copy of accounts AND
+ * called onUpdateAccounts inside a useEffect that listed it as a dependency.
+ * This caused an infinite re-render loop that reset state to [] on every
+ * navigation. Removing internal accounts state fixes this permanently.
+ */
+const BankAccountManager = ({ accounts = [], onAdd, onDelete, onReset }) => {
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newAccount, setNewAccount] = useState({
-    name: '',
-    lastFourDigits: ''
-  });
-  const [errors, setErrors] = useState({});
-
-  // Load user accounts from localStorage
-  useEffect(() => {
-    if (!user || !user.id) {
-      setAccounts([]);
-      return;
-    }
-    
-    try {
-      const userAccountsKey = `bank_accounts_${user.id}`;
-      const savedAccounts = localStorage.getItem(userAccountsKey);
-      
-      if (savedAccounts) {
-        const parsedAccounts = JSON.parse(savedAccounts);
-        setAccounts(Array.isArray(parsedAccounts) ? parsedAccounts : []);
-      } else {
-        setAccounts([]);
-        localStorage.setItem(userAccountsKey, JSON.stringify([]));
-      }
-    } catch (error) {
-      console.error('Error loading bank accounts:', error);
-      setAccounts([]);
-    }
-  }, [user]);
-
-  // Save accounts to localStorage when they change
-  useEffect(() => {
-    if (!user || !user.id) return;
-    
-    try {
-      const userAccountsKey = `bank_accounts_${user.id}`;
-      localStorage.setItem(userAccountsKey, JSON.stringify(Array.isArray(accounts) ? accounts : []));
-      if (onUpdateAccounts) {
-        onUpdateAccounts(Array.isArray(accounts) ? accounts : []);
-      }
-    } catch (error) {
-      console.error('Error saving bank accounts:', error);
-    }
-  }, [accounts, user, onUpdateAccounts]);
+  const [newAccount, setNewAccount]   = useState({ name: '', lastFourDigits: '' });
+  const [errors, setErrors]           = useState({});
 
   const validateForm = () => {
-    const newErrors = {};
-    
-    if (!newAccount.name.trim()) {
-      newErrors.name = 'Account name is required';
-    }
-    
-    if (!newAccount.lastFourDigits.trim()) {
-      newErrors.lastFourDigits = 'Last 4 digits are required';
-    } else if (!/^\d{4}$/.test(newAccount.lastFourDigits)) {
-      newErrors.lastFourDigits = 'Must be exactly 4 digits';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const e = {};
+    if (!newAccount.name.trim())
+      e.name = 'Account name is required';
+    if (!newAccount.lastFourDigits.trim())
+      e.lastFourDigits = 'Last 4 digits are required';
+    else if (!/^\d{4}$/.test(newAccount.lastFourDigits))
+      e.lastFourDigits = 'Must be exactly 4 digits';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleAddAccount = (e) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
-    try {
-      // Validate user exists
-      if (!user || !user.id) {
-        alert('User data not available. Please refresh the page and try again.');
-        return;
-      }
-      
-      // Check for duplicates
-      const accountExists = Array.isArray(accounts) && accounts.some(
-        acc => acc && 
-               (acc.name.toLowerCase() === newAccount.name.toLowerCase() ||
-                acc.lastFourDigits === newAccount.lastFourDigits)
-      );
-      
-      if (accountExists) {
-        alert('An account with this name or last 4 digits already exists');
-        return;
-      }
-      
-      const newAccountObj = {
-        id: Date.now().toString(),
-        name: newAccount.name.trim(),
-        lastFourDigits: newAccount.lastFourDigits,
-        balance: 0, // Initial balance
-        createdAt: new Date().toISOString()
-      };
-      
-      // Validate the new account object
-      if (!newAccountObj.id || !newAccountObj.name || !newAccountObj.lastFourDigits) {
-        console.error('Invalid account data:', newAccountObj);
-        alert('Error creating account: Invalid data provided');
-        return;
-      }
-      
-      const updatedAccounts = [...(Array.isArray(accounts) ? accounts : []), newAccountObj];
-      setAccounts(updatedAccounts);
-      setNewAccount({ name: '', lastFourDigits: '' });
-      setErrors({});
-      setShowAddForm(false);
-      
-      // Save to localStorage immediately
-      try {
-        const userAccountsKey = `bank_accounts_${user.id}`;
-        localStorage.setItem(userAccountsKey, JSON.stringify(updatedAccounts));
-        onUpdateAccounts && onUpdateAccounts(updatedAccounts);
-      } catch (storageError) {
-        console.error('Error saving new account to localStorage:', storageError);
-        alert('Account created but failed to save. Please refresh the page.');
-      }
-      
-    } catch (error) {
-      console.error('Error adding bank account:', error);
-      alert('Failed to add bank account. Please try again.');
-    }
-  };
 
-  const handleDeleteAccount = (accountId) => {
-    if (!accountId) {
-      console.error('Invalid account ID for deletion');
+    const duplicate = safeAccounts.some(
+      acc => acc &&
+        (acc.name.toLowerCase() === newAccount.name.toLowerCase() ||
+         acc.lastFourDigits === newAccount.lastFourDigits)
+    );
+    if (duplicate) {
+      alert('An account with this name or last 4 digits already exists.');
       return;
     }
-    
-    if (window.confirm('Are you sure you want to delete this bank account? This action cannot be undone.')) {
-      try {
-        const updatedAccounts = Array.isArray(accounts) 
-          ? accounts.filter(acc => acc && acc.id !== accountId)
-          : [];
-        setAccounts(updatedAccounts);
-        
-        // Save to localStorage
-        if (user && user.id) {
-          try {
-            const userAccountsKey = `bank_accounts_${user.id}`;
-            localStorage.setItem(userAccountsKey, JSON.stringify(updatedAccounts));
-            onUpdateAccounts && onUpdateAccounts(updatedAccounts);
-          } catch (storageError) {
-            console.error('Error saving updated accounts to localStorage:', storageError);
-          }
-        }
-      } catch (error) {
-        console.error('Error deleting bank account:', error);
-        alert('Failed to delete bank account. Please try again.');
-      }
+
+    onAdd && onAdd({
+      id:             `acc_${Date.now()}`,
+      name:           newAccount.name.trim(),
+      lastFourDigits: newAccount.lastFourDigits,
+      balance:        0,
+      createdAt:      new Date().toISOString(),
+    });
+
+    setNewAccount({ name: '', lastFourDigits: '' });
+    setErrors({});
+    setShowAddForm(false);
+  };
+
+  const handleDeleteAccount = (id) => {
+    if (!id) return;
+    if (window.confirm('Delete this bank account? This cannot be undone.')) {
+      onDelete && onDelete(id);
     }
   };
 
-  const resetAllAccounts = () => {
-    if (window.confirm('Are you sure you want to reset all bank account data? This will remove all accounts and reset balances to 0.')) {
-      try {
-        setAccounts([]);
-        if (user && user.id) {
-          try {
-            const userAccountsKey = `bank_accounts_${user.id}`;
-            localStorage.setItem(userAccountsKey, JSON.stringify([]));
-          } catch (storageError) {
-            console.error('Error resetting accounts in localStorage:', storageError);
-          }
-        }
-        onUpdateAccounts && onUpdateAccounts([]);
-      } catch (error) {
-        console.error('Error resetting bank accounts:', error);
-        alert('Failed to reset bank accounts. Please try again.');
-      }
+  const handleReset = () => {
+    if (window.confirm('Reset ALL bank accounts? Balances will be cleared.')) {
+      onReset && onReset();
     }
   };
 
   return (
     <motion.div
-      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl classy-element"
+      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl"
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
+      {/* Header */}
       <div className="flex items-center justify-between mb-8 pb-2 border-b border-white/10">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
@@ -192,7 +91,9 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">Bank Accounts</h2>
-            <p className="text-sm text-gray-400">Manage your bank accounts</p>
+            <p className="text-sm text-gray-400">
+              {safeAccounts.length} account{safeAccounts.length !== 1 ? 's' : ''} · entries persist across navigation
+            </p>
           </div>
         </div>
         <motion.button
@@ -205,10 +106,10 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
         </motion.button>
       </div>
 
-      {/* Bank Account List */}
+      {/* Account List */}
       <div className="space-y-4">
         <AnimatePresence>
-          {Array.isArray(accounts) && accounts.length === 0 ? (
+          {safeAccounts.length === 0 ? (
             <motion.div
               className="text-center py-10"
               initial={{ opacity: 0 }}
@@ -220,7 +121,7 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
               <p className="text-gray-400">Add your first bank account to get started</p>
             </motion.div>
           ) : (
-            accounts.map((account) => (
+            safeAccounts.map((account) => (
               <motion.div
                 key={account.id}
                 className="flex items-center justify-between p-5 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300"
@@ -238,8 +139,10 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
                     <p className="text-sm text-gray-400">**** **** **** {account.lastFourDigits}</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-white font-medium">₹{account.balance?.toLocaleString() || '0'}</span>
+                <div className="flex items-center space-x-3">
+                  <span className="text-white font-medium">
+                    ₹{(account.balance || 0).toLocaleString()}
+                  </span>
                   <button
                     onClick={() => handleDeleteAccount(account.id)}
                     className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition-all duration-300"
@@ -253,7 +156,7 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
         </AnimatePresence>
       </div>
 
-      {/* Add Account Form Modal */}
+      {/* Add Account Modal */}
       <AnimatePresence>
         {showAddForm && (
           <motion.div
@@ -269,22 +172,19 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
               exit={{ scale: 0.9, opacity: 0 }}
             >
               <h3 className="text-xl font-bold text-white mb-6">Add New Bank Account</h3>
-              
               <form onSubmit={handleAddAccount} className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-3">Account Name</label>
                   <input
                     type="text"
                     value={newAccount.name}
-                    onChange={(e) => setNewAccount({...newAccount, name: e.target.value})}
-                    placeholder="e.g., Savings Account, Credit Card"
-                    className={`w-full px-4 py-4 bg-black/30 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 ${
+                    onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
+                    placeholder="e.g., HDFC Savings, SBI Current"
+                    className={`w-full px-4 py-4 bg-black/30 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                       errors.name ? 'border-red-500' : 'border-white/20'
                     }`}
                   />
-                  {errors.name && (
-                    <p className="text-red-400 text-sm mt-2">{errors.name}</p>
-                  )}
+                  {errors.name && <p className="text-red-400 text-sm mt-2">{errors.name}</p>}
                 </div>
 
                 <div>
@@ -292,10 +192,15 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
                   <input
                     type="text"
                     value={newAccount.lastFourDigits}
-                    onChange={(e) => setNewAccount({...newAccount, lastFourDigits: e.target.value.replace(/\D/g, '').slice(0, 4)})}
+                    onChange={(e) =>
+                      setNewAccount({
+                        ...newAccount,
+                        lastFourDigits: e.target.value.replace(/\D/g, '').slice(0, 4),
+                      })
+                    }
                     placeholder="e.g., 1234"
                     maxLength="4"
-                    className={`w-full px-4 py-4 bg-black/30 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 ${
+                    className={`w-full px-4 py-4 bg-black/30 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                       errors.lastFourDigits ? 'border-red-500' : 'border-white/20'
                     }`}
                   />
@@ -329,11 +234,11 @@ const BankAccountManager = ({ user, onUpdateAccounts }) => {
         )}
       </AnimatePresence>
 
-      {/* Reset Accounts Button */}
-      {accounts.length > 0 && (
+      {/* Reset */}
+      {safeAccounts.length > 0 && (
         <div className="mt-8 pt-6 border-t border-white/10">
           <button
-            onClick={resetAllAccounts}
+            onClick={handleReset}
             className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg transition-all duration-300 flex items-center justify-center space-x-2"
           >
             <X className="h-4 w-4" />

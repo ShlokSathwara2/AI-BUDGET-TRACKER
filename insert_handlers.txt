@@ -1,0 +1,29 @@
+// ── Individual bank account actions (for fully controlled BankAccountManager) ──
+const handleAddBankAccount = useCallback((newAccount) => {
+  const added = addBankAccount(newAccount);
+  if (added) {
+    showToast(`✅ Bank account "${added.name}" added successfully!`);
+    if (user?.id) addBankAccountAPI({ ...added, user: user.id }).catch(console.error);
+  }
+}, [addBankAccount, showToast, user]);
+
+const handleDeleteBankAccount = useCallback((accountId) => {
+  deleteBankAccount(accountId);
+  showToast('✅ Bank account deleted!');
+  if (user?.id) deleteBankAccountAPI(accountId).catch(console.error);
+}, [deleteBankAccount, showToast, user]);
+
+const handleResetBankAccounts = useCallback(() => {
+  const empty = [];
+  setBankAccounts(empty);
+  try {
+    const key = `bank_accounts_${user.id}`;
+    localStorage.setItem(key, JSON.stringify([]));
+  } catch {}
+  showToast('⚠️ All bank accounts reset!');
+  if (user?.id) {
+    import('./utils/api').then(({ syncBankAccounts }) => {
+      syncBankAccounts(user.id, []).catch(console.error);
+    });
+  }
+}, [setBankAccounts, showToast, user]);

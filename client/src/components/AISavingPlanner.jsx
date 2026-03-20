@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { PiggyBank, Target, Calendar, TrendingUp, Clock, CheckCircle, Sparkles, DollarSign, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const AISavingPlanner = ({ transactions = [] }) => {
-  const [goals, setGoals] = useState([]);
-
+const AISavingPlanner = ({ transactions = [], user, goals: parentGoals, setGoals: parentSetGoals }) => {
+  // Use parent goals if provided, otherwise use local state for backwards compatibility
+  const [localGoals, setLocalGoals] = useState([]);
+  const goals = parentGoals !== undefined ? parentGoals : localGoals;
+  const setGoals = parentSetGoals || setLocalGoals;
+  
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [newGoal, setNewGoal] = useState({
     name: '',
@@ -14,6 +17,28 @@ const AISavingPlanner = ({ transactions = [] }) => {
     category: 'savings',
     description: ''
   });
+
+  // User-specific key so goals persist per user and don't vanish on navigation
+  const goalsKey = user?.id ? `saving_goals_${user.id}` : 'saving_goals_guest';
+
+  // Only load/save to localStorage if NOT using parent state (for standalone usage)
+  // When using parent state, App.jsx handles localStorage persistence
+  useEffect(() => {
+    if (parentGoals === undefined) {
+      // Standalone mode - load from localStorage
+      try {
+        const saved = localStorage.getItem(goalsKey);
+        setLocalGoals(saved ? JSON.parse(saved) : []);
+      } catch { setLocalGoals([]); }
+    }
+  }, [goalsKey, parentGoals]);
+
+  useEffect(() => {
+    if (parentSetGoals === undefined) {
+      // Standalone mode - save to localStorage
+      try { localStorage.setItem(goalsKey, JSON.stringify(goals)); } catch {}
+    }
+  }, [goals, goalsKey, parentSetGoals]);
 
   // Calculate total income and expenses for AI recommendations
   const calculateFinancialStats = () => {
@@ -103,7 +128,9 @@ const AISavingPlanner = ({ transactions = [] }) => {
       suggestedMonthly: aiSuggestions.monthly,
       suggestedWeekly: aiSuggestions.weekly,
       aiFeasibility: aiSuggestions.feasibility,
-      incomePercentage: aiSuggestions.incomePercentage
+      incomePercentage: aiSuggestions.incomePercentage,
+      progress: 0,
+      lastWeeklyUpdate: null
     };
 
     setGoals([...goals, goal]);
@@ -124,7 +151,13 @@ const AISavingPlanner = ({ transactions = [] }) => {
         const newAmount = Math.min(goal.currentAmount + amount, goal.targetAmount);
         const status = newAmount >= goal.targetAmount ? 'completed' : 'in-progress';
         const progress = calculateProgress(newAmount, goal.targetAmount);
-        return { ...goal, currentAmount: newAmount, status, progress };
+        return { 
+          ...goal, 
+          currentAmount: newAmount, 
+          status, 
+          progress,
+          lastWeeklyUpdate: new Date().toISOString()
+        };
       }
       return goal;
     }));
@@ -132,6 +165,31 @@ const AISavingPlanner = ({ transactions = [] }) => {
 
   const deleteGoal = (goalId) => {
     setGoals(goals.filter(goal => goal.id !== goalId));
+  };
+
+  // Weekly progress update function
+  const updateWeeklyProgress = (goalId) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+    
+    const amount = prompt(`How much have you saved this week for "${goal.name}"?\nEnter the amount you want to add:`);
+    if (amount && !isNaN(amount) && parseFloat(amount) > 0) {
+      updateGoalProgress(goalId, parseFloat(amount));
+      alert(`Great job! ₹${amount} added to your goal.`);
+    }
+  };
+
+  // Check if it's a new week for prompting
+  const checkWeekPrompt = (goal) => {
+    const lastUpdate = goal.lastWeeklyUpdate ? new Date(goal.lastWeeklyUpdate) : null;
+    const now = new Date();
+    
+    if (!lastUpdate) return true; // Never updated, show prompt
+    
+    // Check if at least 7 days have passed
+    const diffTime = Math.abs(now - lastUpdate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 7;
   };
 
   const getClassyGradient = (priority) => {
@@ -286,6 +344,19 @@ const AISavingPlanner = ({ transactions = [] }) => {
                       {goal.status === 'completed' ? 'Completed' : 'In Progress'}
                     </div>
                   </div>
+
+                  {/* Weekly Progress Prompt */}
+                  {goal.status !== 'completed' && checkWeekPrompt(goal) && (
+                    <div className="mb-3">
+                      <button
+                        onClick={() => updateWeeklyProgress(goal.id)}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm rounded-lg hover:from-green-500 hover:to-emerald-500 transition-all flex items-center justify-center space-x-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Update Weekly Progress</span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* AI Suggestions Section */}
                   <div className="bg-black/20 rounded-lg p-3 mb-3">

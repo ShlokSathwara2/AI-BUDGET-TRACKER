@@ -7,23 +7,30 @@ const Reports = ({ transactions = [], accounts = [] }) => {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedAccount, setSelectedAccount] = useState('all');
+
+  // Filter transactions by selected account
+  const accountFilteredTransactions = useMemo(() => {
+    if (selectedAccount === 'all') return transactions;
+    return transactions.filter(tx => tx.bankAccountId === selectedAccount);
+  }, [transactions, selectedAccount]);
 
   // Get available years from transactions
   const availableYears = useMemo(() => {
     const years = new Set();
-    transactions.forEach(t => {
+    accountFilteredTransactions.forEach(t => {
       if (t.date) {
         const date = new Date(t.date);
         years.add(date.getFullYear());
       }
     });
     return Array.from(years).sort((a, b) => b - a);
-  }, [transactions]);
+  }, [accountFilteredTransactions]);
 
   // Get available months for the selected year
   const availableMonths = useMemo(() => {
     const months = new Set();
-    transactions.forEach(t => {
+    accountFilteredTransactions.forEach(t => {
       if (t.date) {
         const date = new Date(t.date);
         if (date.getFullYear() === selectedYear) {
@@ -32,13 +39,13 @@ const Reports = ({ transactions = [], accounts = [] }) => {
       }
     });
     return Array.from(months).sort((a, b) => a - b);
-  }, [transactions, selectedYear]);
+  }, [accountFilteredTransactions, selectedYear]);
 
   // Process transactions by month
   const monthlyData = useMemo(() => {
     const monthly = {};
     
-    transactions.forEach(t => {
+    accountFilteredTransactions.forEach(t => {
       if (t.date) {
         const date = new Date(t.date);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -64,7 +71,7 @@ const Reports = ({ transactions = [], accounts = [] }) => {
       net: data.income - data.expenses,
       transactionCount: data.transactions.length
     })).sort((a, b) => new Date(b.month) - new Date(a.month));
-  }, [transactions]);
+  }, [accountFilteredTransactions]);
 
   // Get data for selected month
   const selectedMonthData = useMemo(() => {
@@ -73,7 +80,7 @@ const Reports = ({ transactions = [], accounts = [] }) => {
     
     // Calculate daily breakdown for the selected month
     const dailyData = {};
-    transactions.forEach(t => {
+    accountFilteredTransactions.forEach(t => {
       if (t.date) {
         const date = new Date(t.date);
         if (date.getFullYear() === selectedYear && date.getMonth() === selectedMonth) {
@@ -102,7 +109,7 @@ const Reports = ({ transactions = [], accounts = [] }) => {
 
     // Category breakdown for selected month
     const categoryData = {};
-    transactions.forEach(t => {
+    accountFilteredTransactions.forEach(t => {
       if (t.date) {
         const date = new Date(t.date);
         if (date.getFullYear() === selectedYear && date.getMonth() === selectedMonth) {
@@ -128,7 +135,7 @@ const Reports = ({ transactions = [], accounts = [] }) => {
       dailyData: dailyChartData,
       categoryData: categoryChartData
     };
-  }, [transactions, selectedYear, selectedMonth, monthlyData]);
+  }, [accountFilteredTransactions, selectedYear, selectedMonth, monthlyData]);
 
   // Prepare account-specific data
   const getAccountSpecificData = (accountId) => {
@@ -154,7 +161,11 @@ const Reports = ({ transactions = [], accounts = [] }) => {
   };
 
   // Get data for each account for the selected month
-  const accountData = accounts.map(account => ({
+  const displayedAccounts = selectedAccount === 'all' 
+    ? accounts 
+    : accounts.filter(a => a.id === selectedAccount);
+
+  const accountData = displayedAccounts.map(account => ({
     ...account,
     ...getAccountSpecificData(account.id)
   }));
@@ -196,13 +207,28 @@ const Reports = ({ transactions = [], accounts = [] }) => {
             <div className="flex items-center space-x-2">
               <Filter className="h-5 w-5 text-gray-400" />
               <select
+                value={selectedAccount}
+                onChange={(e) => setSelectedAccount(e.target.value)}
+                className="bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px] truncate"
+              >
+                <option value="all">All Accounts</option>
+                {accounts.filter(a => a && a.id).map(account => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} (****{account.lastFourDigits})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-5 w-5 text-gray-400" />
+              <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                 className="bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {availableYears.map(year => (
+                {availableYears.length > 0 ? availableYears.map(year => (
                   <option key={year} value={year}>{year}</option>
-                ))}
+                )) : <option value={selectedYear}>{selectedYear}</option>}
               </select>
             </div>
             <div className="flex items-center space-x-2">
@@ -212,11 +238,11 @@ const Reports = ({ transactions = [], accounts = [] }) => {
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
                 className="bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {availableMonths.map(month => (
+                {availableMonths.length > 0 ? availableMonths.map(month => (
                   <option key={month} value={month}>
                     {new Date(0, month).toLocaleString('default', { month: 'long' })}
                   </option>
-                ))}
+                )) : <option value={selectedMonth}>{new Date(0, selectedMonth).toLocaleString('default', { month: 'long' })}</option>}
               </select>
             </div>
           </div>

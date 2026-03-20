@@ -6,12 +6,16 @@ import { TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
 const Analytics = ({ transactions = [], bankAccounts = [] }) => {
   const [timeRange, setTimeRange] = useState('month');
   const [chartType, setChartType] = useState('both'); // 'both', 'income', 'expenses'
+  const [selectedAccount, setSelectedAccount] = useState('all');
 
-  // Filter transactions by time range
+  // Filter transactions by time range and account
   const filteredTransactions = transactions.filter(tx => {
     if (!tx.date) return false; // Skip transactions without dates
     const txDate = new Date(tx.date);
     if (isNaN(txDate.getTime())) return false; // Skip invalid dates
+    
+    // Filter by account if not 'all'
+    if (selectedAccount !== 'all' && tx.bankAccountId !== selectedAccount) return false;
     
     const now = new Date();
     const diffTime = Math.abs(now - txDate);
@@ -134,7 +138,11 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
   };
 
   // Get data for each account
-  const accountData = bankAccounts.map(account => ({
+  const displayedAccounts = selectedAccount === 'all' 
+    ? bankAccounts 
+    : bankAccounts.filter(a => a.id === selectedAccount);
+
+  const accountData = displayedAccounts.map(account => ({
     ...account,
     ...getAccountSpecificData(account.id)
   }));
@@ -157,7 +165,20 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
           </div>
         </div>
         
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={selectedAccount}
+            onChange={(e) => setSelectedAccount(e.target.value)}
+            className="px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px] truncate"
+          >
+            <option value="all">All Accounts</option>
+            {bankAccounts.filter(a => a && a.id).map(account => (
+              <option key={account.id} value={account.id}>
+                {account.name} (****{account.lastFourDigits})
+              </option>
+            ))}
+          </select>
+          
           <select
             value={chartType}
             onChange={(e) => setChartType(e.target.value)}

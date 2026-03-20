@@ -4,12 +4,13 @@ import { User, Bell, Shield, Globe, Moon, Sun, CreditCard, Download, Upload, Tra
 import ThemeToggle from './ThemeToggle';
 import { useTheme } from '../contexts/ThemeContext';
 
-const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, setBankAccounts }) => {
+const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, setBankAccounts, onScrollToSection }) => {
   const [user, setUser] = useState({ name: '', email: '' });
   const [editedName, setEditedName] = useState('');
   const [editedEmail, setEditedEmail] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [activeSection, setActiveSection] = useState(null);
   
   const [darkMode, setDarkMode] = useState(true);
   const [notifications, setNotifications] = useState({
@@ -114,6 +115,17 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
     } catch (error) {
       console.error('Error exporting data:', error);
       alert('Error exporting data. Please try again.');
+    }
+  };
+
+  // Scroll to section function
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setActiveSection(sectionId);
+      // Remove highlight after 2 seconds
+      setTimeout(() => setActiveSection(null), 2000);
     }
   };
 
@@ -245,6 +257,14 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
         const userAccountsKey = `bank_accounts_${user.id}`;
         localStorage.setItem(userAccountsKey, JSON.stringify([]));
         
+        // Clear payment reminders
+        const userRemindersKey = `payment_reminders_${user.id}`;
+        localStorage.setItem(userRemindersKey, JSON.stringify([]));
+        
+        // Clear saving goals
+        const userGoalsKey = `saving_goals_${user.id}`;
+        localStorage.setItem(userGoalsKey, JSON.stringify([]));
+        
         // Update state to reflect cleared data
         setTransactions([]);
         setGoals([]);
@@ -259,7 +279,10 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
     <div className="space-y-6">
       {/* Profile Section */}
       <motion.div 
-        className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element"
+        id="profile-section"
+        className={`bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element transition-all duration-300 ${
+          activeSection === 'profile-section' ? 'ring-2 ring-blue-500 scale-[1.02]' : ''
+        }`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -359,7 +382,10 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
 
       {/* Notification Settings */}
       <motion.div 
-        className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element"
+        id="notifications-section"
+        className={`bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element transition-all duration-300 ${
+          activeSection === 'notifications-section' ? 'ring-2 ring-yellow-500 scale-[1.02]' : ''
+        }`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
@@ -464,7 +490,10 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
 
       {/* Privacy Settings */}
       <motion.div 
-        className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element"
+        id="privacy-section"
+        className={`bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element transition-all duration-300 ${
+          activeSection === 'privacy-section' ? 'ring-2 ring-red-500 scale-[1.02]' : ''
+        }`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
@@ -533,7 +562,10 @@ const Settings = ({ currentUser, transactions = [], setTransactions, setGoals, s
 
       {/* Data Management */}
       <motion.div 
-        className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element"
+        id="export-section"
+        className={`bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl classy-element transition-all duration-300 ${
+          activeSection === 'export-section' ? 'ring-2 ring-green-500 scale-[1.02]' : ''
+        }`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}

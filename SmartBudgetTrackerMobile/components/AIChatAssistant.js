@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TextInput, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import { 
-  IconButton, 
   Text, 
+  TextInput, 
+  Button, 
   Card, 
-  Button,
-  Portal,
-  Modal,
-  Chip
+  Title,
+  IconButton,
+  Chip,
+  useTheme
 } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 
 const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setIsVisible }) => {
   const [messages, setMessages] = useState([
@@ -22,17 +24,18 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const flatListRef = useRef(null);
-
-  const scrollToBottom = () => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToEnd({ animated: true });
-    }
-  };
+  const messagesEndRef = useRef(null);
+  const theme = useTheme();
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   // Financial analysis functions
   const analyzeSpending = () => {
@@ -41,28 +44,28 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
     }
 
     const now = new Date();
-    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
     const recentTransactions = transactions.filter(tx => 
       new Date(tx.date) >= oneMonthAgo && tx.type === 'debit'
     );
     
-    const totalSpent = recentTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+    const totalSpent = recentTransactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
     const avgDailySpending = totalSpent / 30;
     
     const categorySpending = {};
     recentTransactions.forEach(tx => {
       const category = tx.category || 'Other';
-      categorySpending[category] = (categorySpending[category] || 0) + (tx.amount || 0);
+      categorySpending[category] = (categorySpending[category] || 0) + parseFloat(tx.amount || 0);
     });
     
     const topCategory = Object.entries(categorySpending)
       .sort(([,a], [,b]) => b - a)[0];
     
     return `Based on your recent spending (last 30 days):
-    • Total spent: ₹${totalSpent.toLocaleString()}
-    • Average daily spending: ₹${avgDailySpending.toFixed(2)}
-    • Your biggest spending category: ${topCategory ? `${topCategory[0]} (₹${topCategory[1].toLocaleString()})` : 'No clear pattern'}`;
+• Total spent: ₹${totalSpent.toLocaleString()}
+• Average daily spending: ₹${avgDailySpending.toFixed(2)}
+• Your biggest spending category: ${topCategory ? `${topCategory[0]} (₹${topCategory[1].toLocaleString()})` : 'No clear pattern'}`;
   };
 
   const provideSavingsAdvice = () => {
@@ -73,8 +76,8 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
     const incomeTransactions = transactions.filter(tx => tx.type === 'credit');
     const expenseTransactions = transactions.filter(tx => tx.type === 'debit');
     
-    const totalIncome = incomeTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const totalExpenses = expenseTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+    const totalIncome = incomeTransactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
+    const totalExpenses = expenseTransactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
     const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
     
     let advice = `Your current savings rate is ${savingsRate.toFixed(1)}%. `;
@@ -90,73 +93,11 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
     return advice;
   };
 
-  const accountAnalysis = (accountName) => {
-    if (!bankAccounts || bankAccounts.length === 0) {
-      return "You haven't added any bank accounts yet. Please add your accounts to get detailed analysis.";
-    }
-    
-    const account = bankAccounts.find(acc => 
-      acc.name.toLowerCase().includes(accountName.toLowerCase()) || 
-      acc.lastFourDigits === accountName
-    );
-    
-    if (!account) {
-      return `I couldn't find an account matching "${accountName}". Your accounts are: ${bankAccounts.map(acc => acc.name).join(', ')}`;
-    }
-    
-    const accountTransactions = transactions.filter(tx => tx.bankAccountId === account.id);
-    const income = accountTransactions.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const expenses = accountTransactions.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const balance = income - expenses;
-    
-    return `Analysis for ${account.name}:
-    • Current balance: ₹${balance.toLocaleString()}
-    • Total income: ₹${income.toLocaleString()}
-    • Total expenses: ₹${expenses.toLocaleString()}
-    • Net flow: ${balance >= 0 ? '+' : ''}₹${balance.toLocaleString()}`;
-  };
-
-  const generateResponse = async (userMessage) => {
-    const message = userMessage.toLowerCase();
-    
-    // Financial advice patterns
-    if (message.includes('spend') || message.includes('spending') || message.includes('expense')) {
-      return analyzeSpending();
-    }
-    
-    if (message.includes('save') || message.includes('savings') || message.includes('saving')) {
-      return provideSavingsAdvice();
-    }
-    
-    if (message.includes('account') || message.includes('balance')) {
-      const accountName = message.split('account')[1] || message.split('balance')[1] || '';
-      return accountAnalysis(accountName.trim());
-    }
-    
-    if (message.includes('budget') || message.includes('plan')) {
-      return "I'd be happy to help with budgeting! Consider following the 50/30/20 rule: 50% needs, 30% wants, 20% savings. Based on your income, I can help you calculate specific amounts for each category.";
-    }
-    
-    if (message.includes('invest') || message.includes('investment')) {
-      return "For investments, consider starting with emergency funds (3-6 months expenses), then low-risk options like mutual funds or index funds. Your risk tolerance and time horizon should guide your investment strategy.";
-    }
-    
-    // Default responses
-    const responses = [
-      "I'd be happy to help with that! Could you be more specific about what financial advice you need?",
-      "That's a great question! Let me know more details so I can provide personalized guidance.",
-      "I can help you with budgeting, saving, spending analysis, and financial planning. What area would you like to focus on?",
-      "For the best advice, I'll need to understand your specific situation. Can you tell me more about your financial goals?"
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
-  };
-
-  const handleSendMessage = async () => {
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage = {
-      id: messages.length + 1,
+      id: Date.now(),
       text: inputValue,
       sender: 'user',
       timestamp: new Date()
@@ -166,12 +107,12 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI thinking time
-    setTimeout(async () => {
-      const aiResponse = await generateResponse(inputValue);
+    // Process user input and generate AI response
+    setTimeout(() => {
+      const aiResponse = generateAIResponse(inputValue);
       
       const aiMessage = {
-        id: messages.length + 2,
+        id: Date.now() + 1,
         text: aiResponse,
         sender: 'ai',
         timestamp: new Date()
@@ -179,184 +120,164 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
 
       setMessages(prev => [...prev, aiMessage]);
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }, 1500);
   };
 
-  const renderMessage = ({ item }) => (
-    <View style={[
-      styles.messageContainer,
-      item.sender === 'user' ? styles.userMessage : styles.aiMessage
-    ]}>
-      <Card style={[
-        styles.messageCard,
-        item.sender === 'user' ? styles.userCard : styles.aiCard
-      ]}>
-        <Card.Content>
-          <Text style={[
-            styles.messageText,
-            item.sender === 'user' ? styles.userText : styles.aiText
-          ]}>
-            {item.text}
-          </Text>
-          <Text style={[
-            styles.timestamp,
-            item.sender === 'user' ? styles.userTimestamp : styles.aiTimestamp
-          ]}>
-            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </Card.Content>
-      </Card>
-      <IconButton
-        icon={item.sender === 'user' ? 'account' : 'robot'}
-        size={20}
-        style={[
-          styles.avatar,
-          item.sender === 'user' ? styles.userAvatar : styles.aiAvatar
-        ]}
-        iconColor={item.sender === 'user' ? '#fff' : '#fff'}
-      />
-    </View>
-  );
+  const generateAIResponse = (input) => {
+    const lowerInput = input.toLowerCase();
+    
+    // Spending analysis
+    if (lowerInput.includes('spending') || lowerInput.includes('expense') || lowerInput.includes('where did my money go')) {
+      return analyzeSpending();
+    }
+    
+    // Savings advice
+    if (lowerInput.includes('saving') || lowerInput.includes('save') || lowerInput.includes('invest')) {
+      return provideSavingsAdvice();
+    }
+    
+    // Budget help
+    if (lowerInput.includes('budget') || lowerInput.includes('plan')) {
+      return "Based on your income and expenses, I recommend following the 50/30/20 rule:\n• 50% for Needs (rent, groceries, utilities)\n• 30% for Wants (dining, entertainment)\n• 20% for Savings & Debt Repayment\n\nWould you like me to analyze how well you're following this budget?";
+    }
+    
+    // Financial tips
+    if (lowerInput.includes('tip') || lowerInput.includes('advice') || lowerInput.includes('help')) {
+      const tips = [
+        "💡 Try cooking at home more often - it can save you ₹3,000-5,000 per month compared to dining out!",
+        "💰 Set up automatic transfers to your savings account right after payday. Pay yourself first!",
+        "📊 Track your expenses for 30 days - awareness is the first step to better money management.",
+        "🎯 Create specific savings goals (emergency fund, vacation, etc.) to stay motivated.",
+        "💳 Use credit cards wisely - pay the full balance each month to avoid interest charges."
+      ];
+      return tips[Math.floor(Math.random() * tips.length)];
+    }
+    
+    // Default response
+    return "I'd be happy to help you with your finances! You can ask me about:\n• Your spending patterns\n• Savings recommendations\n• Budget planning\n• Financial tips\n\nWhat would you like to know?";
+  };
 
   const quickActions = [
-    { text: 'Analyze Spending', action: 'Analyze my spending patterns' },
-    { text: 'Savings Advice', action: 'How can I save more money?' },
-    { text: 'Account Analysis', action: 'Tell me about my accounts' },
-    { text: 'Budget Planning', action: 'Help with budget planning' }
+    { label: 'Analyze Spending', icon: 'trending-down', query: 'Analyze my spending' },
+    { label: 'Savings Tips', icon: 'piggy-bank', query: 'Give me savings advice' },
+    { label: 'Budget Help', icon: 'wallet', query: 'Help me create a budget' },
+    { label: 'Financial Tips', icon: 'lightbulb', query: 'Give me a financial tip' }
   ];
 
-  if (!isVisible) {
-    return (
-      <IconButton
-        icon="message"
-        size={24}
-        onPress={() => setIsVisible(true)}
-        style={styles.floatingButton}
-        iconColor="#fff"
-      />
-    );
-  }
-
   return (
-    <Portal>
-      <Modal
-        visible={isVisible}
-        onDismiss={() => setIsVisible(false)}
-        contentContainerStyle={styles.modalContainer}
-      >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-        >
+    <Modal visible={isVisible} animationType="slide" transparent={true}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.chatContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <IconButton
-                icon="robot"
-                size={24}
-                style={styles.headerIcon}
-                iconColor="#fff"
-              />
-              <View>
-                <Text style={styles.headerTitle}>AI Financial Advisor</Text>
-                <Text style={styles.headerSubtitle}>Always here to help with your finances</Text>
-              </View>
+            <View style={styles.headerLeft}>
+              <Ionicons name="chatbubbles" size={28} color="#6200ee" />
+              <Title style={styles.headerTitle}>AI Financial Advisor</Title>
             </View>
             <IconButton
               icon="close"
               size={24}
               onPress={() => setIsVisible(false)}
-              iconColor="#999"
             />
           </View>
 
           {/* Messages */}
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id.toString()}
-            style={styles.messagesList}
-            contentContainerStyle={styles.messagesContainer}
-          />
-
-          {/* Typing Indicator */}
-          {isTyping && (
-            <View style={[styles.messageContainer, styles.aiMessage]}>
-              <Card style={styles.aiCard}>
-                <Card.Content>
-                  <View style={styles.typingIndicator}>
-                    <View style={styles.typingDot} />
-                    <View style={[styles.typingDot, { animationDelay: 100 }]} />
-                    <View style={[styles.typingDot, { animationDelay: 200 }]} />
-                  </View>
-                </Card.Content>
-              </Card>
-              <IconButton
-                icon="robot"
-                size={20}
-                style={styles.aiAvatar}
-                iconColor="#fff"
-              />
-            </View>
-          )}
+          <ScrollView 
+            ref={messagesEndRef}
+            style={styles.messagesContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {messages.map((message) => (
+              <View
+                key={message.id}
+                style={[
+                  styles.messageBubble,
+                  message.sender === 'user' ? styles.userMessage : styles.aiMessage
+                ]}
+              >
+                {message.sender === 'ai' && (
+                  <Ionicons name="robot" size={20} color="#6200ee" style={styles.aiIcon} />
+                )}
+                <Text style={[
+                  styles.messageText,
+                  message.sender === 'user' ? styles.userMessageText : styles.aiMessageText
+                ]}>
+                  {message.text}
+                </Text>
+              </View>
+            ))}
+            
+            {isTyping && (
+              <View style={[styles.messageBubble, styles.aiMessage]}>
+                <Ionicons name="robot" size={20} color="#6200ee" style={styles.aiIcon} />
+                <View style={styles.typingIndicator}>
+                  <View style={styles.typingDot} />
+                  <View style={styles.typingDot} />
+                  <View style={styles.typingDot} />
+                </View>
+              </View>
+            )}
+          </ScrollView>
 
           {/* Quick Actions */}
-          <View style={styles.quickActionsContainer}>
-            <Text style={styles.quickActionsTitle}>Quick Actions</Text>
-            <View style={styles.chipContainer}>
-              {quickActions.map((action, index) => (
-                <Chip
-                  key={index}
-                  onPress={() => setInputValue(action.action)}
-                  style={styles.chip}
-                  textStyle={styles.chipText}
-                >
-                  {action.text}
-                </Chip>
-              ))}
-            </View>
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActionsContainer}>
+            {quickActions.map((action, index) => (
+              <Chip
+                key={index}
+                icon={action.icon}
+                onPress={() => {
+                  setInputValue(action.query);
+                  setTimeout(() => handleSend(), 100);
+                }}
+                style={styles.quickActionChip}
+                textStyle={styles.quickActionText}
+              >
+                {action.label}
+              </Chip>
+            ))}
+          </ScrollView>
 
           {/* Input */}
           <View style={styles.inputContainer}>
             <TextInput
               value={inputValue}
               onChangeText={setInputValue}
-              placeholder="Ask me anything about your finances..."
-              style={styles.input}
+              placeholder="Ask me anything..."
+              mode="outlined"
+              style={styles.textInput}
               multiline
-              numberOfLines={2}
               maxLength={500}
+              onSubmitEditing={handleSend}
             />
-            <IconButton
-              icon="send"
-              size={24}
-              onPress={handleSendMessage}
-              disabled={!inputValue.trim() || isTyping}
+            <TouchableOpacity
+              onPress={handleSend}
               style={[
                 styles.sendButton,
-                (!inputValue.trim() || isTyping) && styles.sendButtonDisabled
+                { backgroundColor: !inputValue.trim() ? '#ccc' : '#6200ee' }
               ]}
-              iconColor="#fff"
-            />
+              disabled={!inputValue.trim()}
+            >
+              <Ionicons name="send" size={20} color="white" />
+            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </Portal>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  modalContainer: {
-    backgroundColor: '#1a1a1a',
-    margin: 10,
-    borderRadius: 16,
-    height: '85%',
+  chatContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -364,152 +285,99 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#e0e0e0',
   },
-  headerContent: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerIcon: {
-    backgroundColor: '#6200ee',
-    marginRight: 12,
-  },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#999',
-  },
-  messagesList: {
-    flex: 1,
+    marginLeft: 12,
   },
   messagesContainer: {
+    flex: 1,
     padding: 16,
+    maxHeight: 400,
   },
-  messageContainer: {
+  messageBubble: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 16,
+    marginBottom: 12,
+    maxWidth: '80%',
   },
   userMessage: {
-    justifyContent: 'flex-end',
-    flexDirection: 'row-reverse',
+    alignSelf: 'flex-end',
   },
   aiMessage: {
-    justifyContent: 'flex-start',
+    alignSelf: 'flex-start',
   },
-  messageCard: {
-    maxWidth: '80%',
-    borderRadius: 16,
-  },
-  userCard: {
-    backgroundColor: '#6200ee',
-    marginLeft: 8,
-  },
-  aiCard: {
-    backgroundColor: '#333',
+  aiIcon: {
     marginRight: 8,
-  },
-  messageText: {
-    fontSize: 14,
-  },
-  userText: {
-    color: '#fff',
-  },
-  aiText: {
-    color: '#fff',
-  },
-  timestamp: {
-    fontSize: 10,
     marginTop: 4,
   },
-  userTimestamp: {
-    color: '#e0e0e0',
+  messageText: {
+    fontSize: 15,
+    lineHeight: 22,
+    flex: 1,
   },
-  aiTimestamp: {
-    color: '#999',
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  userAvatar: {
+  userMessageText: {
+    color: 'white',
     backgroundColor: '#6200ee',
+    padding: 12,
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
   },
-  aiAvatar: {
-    backgroundColor: '#bb86fc',
+  aiMessageText: {
+    color: '#333',
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
   },
   typingIndicator: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
+    padding: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
   },
   typingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#bb86fc',
+    backgroundColor: '#999',
     marginHorizontal: 2,
   },
   quickActionsContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: '#e0e0e0',
   },
-  quickActionsTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+  quickActionChip: {
+    marginRight: 8,
+    backgroundColor: '#f5f5f5',
   },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    backgroundColor: '#333',
-  },
-  chipText: {
-    color: '#fff',
-    fontSize: 12,
+  quickActionText: {
+    fontSize: 13,
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: '#e0e0e0',
   },
-  input: {
+  textInput: {
     flex: 1,
-    backgroundColor: '#333',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#fff',
     marginRight: 8,
-    maxHeight: 100,
+    minHeight: 40,
   },
   sendButton: {
-    backgroundColor: '#6200ee',
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#333',
-  },
-  floatingButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#6200ee',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

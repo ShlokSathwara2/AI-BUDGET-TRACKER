@@ -22,6 +22,23 @@ const Tab = createBottomTabNavigator();
 
 // Bottom Tab Navigator
 function MainTabs({ user, onLogout }) {
+  const [bankAccounts, setBankAccounts] = useState([]);
+  
+  useEffect(() => {
+    loadBankAccounts();
+  }, []);
+  
+  const loadBankAccounts = async () => {
+    try {
+      const savedAccounts = await AsyncStorage.getItem(`bank_accounts_${user.id}`);
+      if (savedAccounts) {
+        setBankAccounts(JSON.parse(savedAccounts));
+      }
+    } catch (error) {
+      console.log('Error loading bank accounts:', error);
+    }
+  };
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -56,7 +73,7 @@ function MainTabs({ user, onLogout }) {
         name="Dashboard" 
         options={{ title: 'Home' }}
       >
-        {props => <DashboardScreen {...props} user={user} onLogout={onLogout} />}
+        {props => <DashboardScreen {...props} user={user} onLogout={onLogout} bankAccounts={bankAccounts} />}
       </Tab.Screen>
       <Tab.Screen 
         name="Reports" 
@@ -68,13 +85,13 @@ function MainTabs({ user, onLogout }) {
         name="Reminders" 
         options={{ title: 'Reminders' }}
       >
-        {props => <PaymentRemindersScreen {...props} navigation={props.navigation} userId={user.id} />}
+        {props => <PaymentRemindersScreen {...props} navigation={props.navigation} userId={user.id} bankAccounts={bankAccounts} />}
       </Tab.Screen>
       <Tab.Screen 
         name="BankAccounts" 
         options={{ title: 'Bank Accounts' }}
       >
-        {props => <BankAccountScreen {...props} userId={user.id} />}
+        {props => <BankAccountScreen {...props} userId={user.id} onAccountsUpdated={loadBankAccounts} />}
       </Tab.Screen>
       <Tab.Screen 
         name="Transactions" 

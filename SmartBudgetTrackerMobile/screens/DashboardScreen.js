@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { 
   Text, 
   Card, 
@@ -8,17 +8,24 @@ import {
   FAB, 
   Divider,
   ActivityIndicator,
-  useTheme
+  useTheme,
+  Chip
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import AIChatAssistant from '../components/AIChatAssistant';
+import VoiceAssistant from '../components/VoiceAssistant';
 
 const DashboardScreen = ({ navigation, user, onLogout }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [paymentReminders, setPaymentReminders] = useState([]);
+  const [showAIChat, setShowAIChat] = useState(false);
   const { colors } = useTheme();
 
   useEffect(() => {
     loadTransactions();
+    loadPaymentReminders();
   }, []);
 
   const loadTransactions = async () => {
@@ -31,6 +38,39 @@ const DashboardScreen = ({ navigation, user, onLogout }) => {
       console.log('Error loading transactions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPaymentReminders = async () => {
+    try {
+      const savedReminders = await AsyncStorage.getItem(`payment_reminders_${user.id}`);
+      if (savedReminders) {
+        setPaymentReminders(JSON.parse(savedReminders));
+      }
+    } catch (error) {
+      console.log('Error loading payment reminders:', error);
+    }
+  };
+
+  const handleVoiceTransaction = (transaction) => {
+    // Add transaction from voice assistant
+    addTransactionToLocal(transaction);
+  };
+
+  const addTransactionToLocal = async (newTransaction) => {
+    try {
+      const transaction = {
+        ...newTransaction,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      };
+      
+      const updatedTransactions = [...transactions, transaction];
+      await AsyncStorage.setItem(`transactions_${user.id}`, JSON.stringify(updatedTransactions));
+      setTransactions(updatedTransactions);
+      Alert.alert('Success', 'Transaction added via voice!');
+    } catch (error) {
+      console.log('Error adding voice transaction:', error);
     }
   };
 
@@ -95,6 +135,65 @@ const DashboardScreen = ({ navigation, user, onLogout }) => {
             </Text>
           </Card.Content>
         </Card>
+
+        {/* Quick Actions - AI Assistants */}
+        <View style={styles.quickActionsContainer}>
+          <TouchableOpacity
+            style={[styles.quickActionButton, { backgroundColor: '#6200ee' }]}
+            onPress={() => setShowAIChat(true)}
+          >
+            <Ionicons name="chatbubbles" size={24} color="white" />
+            <Text style={styles.quickActionText}>AI Chat</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.quickActionButton, { backgroundColor: '#ff9800' }]}
+            onPress={() => navigation.navigate('Reminders')}
+          >
+            <Ionicons name="notifications" size={24} color="white" />
+            <Text style={styles.quickActionText}>Reminders</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.quickActionButton, { backgroundColor: '#4caf50' }]}
+            onPress={() => navigation.navigate('Reports')}
+          >
+            <Ionicons name="analytics" size={24} color="white" />
+            <Text style={styles.quickActionText}>Reports</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Payment Reminders Summary */}
+        {paymentReminders.length > 0 && (
+          <Card style={styles.remindersSummaryCard}>
+            <Card.Content>
+              <View style={styles.cardHeader}>
+                <Title style={styles.cardTitle}>Upcoming Payments</Title>
+                <Button 
+                  mode="text" 
+                  onPress={() => navigation.navigate('Reminders')}
+                  textColor={colors.primary}
+                >
+                  View All
+                </Button>
+              </View>
+              
+              <Divider style={styles.divider} />
+              
+              <View style={styles.remindersList}>
+                {paymentReminders.slice(0, 3).map((reminder) => (
+                  <View key={reminder.id} style={styles.reminderItem}>
+                    <View style={styles.reminderInfo}>
+                      <Text style={styles.reminderTitle}>{reminder.title}</Text>
+                      <Text style={styles.reminderDate}>Due: {reminder.date}{['st', 'nd', 'rd'][((parseInt(reminder.date) % 10) - 1)] || 'th'}</Text>
+                    </View>
+                    <Text style={styles.reminderAmount}>₹{parseFloat(reminder.amount).toLocaleString()}</Text>
+                  </View>
+                ))}
+              </View>
+            </Card.Content>
+          </Card>
+        )}
 
         {/* Summary Cards */}
         <View style={styles.summaryContainer}>
@@ -202,6 +301,20 @@ const DashboardScreen = ({ navigation, user, onLogout }) => {
         icon="plus"
         onPress={handleAddTransaction}
       />
+      
+      {/* Voice Assistant Button */}
+      <VoiceAssistant 
+        onTransactionDetected={handleVoiceTransaction}
+        bankAccounts={[]}
+      />
+      
+      {/* AI Chat Assistant Modal */}
+      <AIChatAssistant 
+        transactions={transactions}
+        bankAccounts={[]}
+        isVisible={showAIChat}
+        setIsVisible={setShowAIChat}
+      />
     </View>
   );
 };
@@ -236,6 +349,32 @@ const styles = StyleSheet.create({
   },
   welcomeSubtitle: {
     color: '#666',
+  },
+  quickActionsContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    justifyContent: 'space-between',
+  },
+  quickActionButton: {
+    flex: 1,
+    marginHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 2,
+  },
+  quickActionText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  remindersSummaryCard: {
+    margin: 16,
+    marginBottom: 0,
+    elevation: 2,
   },
   summaryContainer: {
     flexDirection: 'row',
@@ -274,8 +413,41 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   divider: {
     marginVertical: 8,
+  },
+  remindersList: {
+    marginTop: 8,
+  },
+  reminderItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  reminderInfo: {
+    flex: 1,
+  },
+  reminderTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  reminderDate: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  reminderAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#6200ee',
   },
   emptyState: {
     padding: 20,
