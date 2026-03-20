@@ -1,4 +1,4 @@
-# 🏦 AI Budget Tracker - Smart Financial Management System
+# 🏦 TRIKIA (AI Budget Tracker - Smart Financial Management System)
 
 [![GitHub](https://img.shields.io/github/license/ShlokSathwara/AI-BUDGET-TRACKER)](https://github.com/ShlokSathwara/AI-BUDGET-TRACKER/blob/main/LICENSE)
 [![React](https://img.shields.io/badge/React-19.2.0-blue.svg)](https://reactjs.org/)
