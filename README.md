@@ -117,10 +117,18 @@
   - Analytics Tab (analysis & insights)
 - Synchronized state management
 
-#### 4. **Enhanced Crash Prevention** ✅
+#### 4. **Account-Wise Filtering System** ✅
+> *"Filter graphs and reports by individual bank accounts"*
+
+- Added dynamic dropdowns in Analytics and Reports pages
+- Instantly recalculates charts (Income/Expense, Categories) for a specific account
+- Provides focused individual account analysis views
+
+#### 5. **Enhanced Crash Prevention & Code Cleanup** ✅
 - Replaced 15+ blocking `alert()` calls with modern toast notifications
 - Protected all array access with safety checks
 - Relaxed form validation for flexible input
+- Safely removed 11+ unused legacy duplicate pages/components
 - 100% crash-free guarantee
 
 ---
