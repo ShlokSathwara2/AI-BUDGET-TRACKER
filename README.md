@@ -886,13 +886,13 @@ Special thanks to all contributors who have helped make this project possible!
 ## 📞 Contact
 
 **Developer:** Shlok Sathwara  
-**GitHub:** [@ShlokSathwara](https://github.com/ShlokSathwara)  
-**Project Link:** [AI-BUDGET-TRACKER](https://github.com/ShlokSathwara/AI-BUDGET-TRACKER)
+**GitHub:** [@ShlokSathwara](https://github.com/ShlokSathwara2)  
+**Project Link:** [AI-BUDGET-TRACKER](https://github.com/ShlokSathwara2/AI-BUDGET-TRACKER)
 
 ---
 
 **Made with ❤️ by Shlok Sathwara**
 
-*Last Updated: March 12, 2026*  
+*Last Updated: March 21, 2026*  
 *Version: 1.0.0*  
 *Status: Production Ready ✅*
