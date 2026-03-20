@@ -94,25 +94,26 @@ const VoiceAssistant = ({ onTransactionDetected, isListening, setIsListening, ba
   }, [isListening, bankAccounts]);
 
   const extractAmount = (text) => {
-    // Look for various rupee amount patterns
+    // Look for various rupee amount patterns, supporting commas
     const patterns = [
-      /(?:rs|rupees|₹)\s*(\d+(?:\.\d+)?)/i,
-      /(\d+(?:\.\d+)?)\s*(?:rs|rupees|₹)/i,
-      /paid\s+(\d+(?:\.\d+)?)/i,
-      /spent\s+(\d+(?:\.\d+)?)/i,
-      /cost\s+(\d+(?:\.\d+)?)/i,
-      /buy\s+(?:for\s+)?(\d+(?:\.\d+)?)/i,
-      /purchase\s+(?:for\s+)?(\d+(?:\.\d+)?)/i,
-      /invest\s+(\d+(?:\.\d+)?)/i,
-      /got\s+(\d+(?:\.\d+)?)/i,
-      /received\s+(\d+(?:\.\d+)?)/i,
-      /salary\s+(\d+(?:\.\d+)?)/i
+      /(?:rs\.?|rupees|₹|inr|bucks)\s*([\d,]+(?:\.\d+)?)/i,
+      /([\d,]+(?:\.\d+)?)\s*(?:rs\.?|rupees|₹|inr|bucks)/i,
+      /paid\s+([\d,]+(?:\.\d+)?)/i,
+      /spent\s+([\d,]+(?:\.\d+)?)/i,
+      /cost\s+([\d,]+(?:\.\d+)?)/i,
+      /buy\s+(?:for\s+)?([\d,]+(?:\.\d+)?)/i,
+      /purchase\s+(?:for\s+)?([\d,]+(?:\.\d+)?)/i,
+      /invest(?:ed)?\s+([\d,]+(?:\.\d+)?)/i,
+      /got\s+([\d,]+(?:\.\d+)?)/i,
+      /received\s+([\d,]+(?:\.\d+)?)/i,
+      /salary\s+(?:of\s+)?([\d,]+(?:\.\d+)?)/i
     ];
     
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match && match[1]) {
-        const amount = parseFloat(match[1]);
+        // Strip out commas before parsing
+        const amount = parseFloat(match[1].replace(/,/g, ''));
         if (!isNaN(amount) && amount > 0) {
           return amount;
         }
@@ -120,11 +121,13 @@ const VoiceAssistant = ({ onTransactionDetected, isListening, setIsListening, ba
     }
     
     // Try to find standalone numbers that could be amounts
-    const numbers = text.match(/\b\d{2,}\b/g);
+    // Match numbers with optional commas
+    const numbers = text.match(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\b/g);
     if (numbers) {
       for (const num of numbers) {
-        const amount = parseFloat(num);
-        if (amount >= 10 && amount <= 1000000) { // Reasonable expense/income range
+        const amount = parseFloat(num.replace(/,/g, ''));
+        // Assume anything between 10 and 10 million is a realistic transaction amount
+        if (amount >= 10 && amount <= 10000000) { 
           return amount;
         }
       }
@@ -143,27 +146,28 @@ const VoiceAssistant = ({ onTransactionDetected, isListening, setIsListening, ba
       }
     }
     
-    // Extract potential merchant from context
+    // Extract potential merchant from context, smartly stopping at prepositions
     const merchantPatterns = [
-      /(?:at|from)\s+([A-Za-z\s]+)/i,
-      /paid\s+([A-Za-z\s]+)\s+for/i,
-      /bought\s+.*\s+from\s+([A-Za-z\s]+)/i,
-      /ordered\s+.*\s+from\s+([A-Za-z\s]+)/i,
-      /purchased\s+from\s+([A-Za-z\s]+)/i
+      /(?:at|from)\s+([A-Za-z0-9\s]+?)(?:\s+(?:for|using|with|by|on|in|to)|$)/i,
+      /paid\s+([A-Za-z0-9\s]+?)\s+(?:for|using|with|by|on|in|to)/i,
+      /(?:bought|ordered|purchased)(?:\s+.*\s+)?(?:from)\s+([A-Za-z0-9\s]+?)(?:\s+(?:for|using|with|by|on|in|to)|$)/i,
+      /to\s+([A-Za-z0-9\s]+?)(?:\s+(?:for|using|with|by|on|in|from)|$)/i
     ];
     
     for (const pattern of merchantPatterns) {
       const match = text.match(pattern);
       if (match && match[1]) {
+        // Exclude common false positives
         const extracted = match[1].trim();
-        if (extracted.length >= 2 && extracted.length <= 30) {
-          return extracted.charAt(0).toUpperCase() + extracted.slice(1).toLowerCase();
+        const blacklist = ['cash', 'card', 'bank', 'account', 'friend', 'me', 'him', 'her', 'them', 'my', 'the', 'a', 'an'];
+        if (extracted.length >= 2 && extracted.length <= 40 && !blacklist.includes(extracted.toLowerCase())) {
+          return extracted.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
         }
       }
     }
     
-    // Extract capitalized words that could be merchants
-    const capitalizedWords = text.match(/[A-Z][a-z]{2,}/g);
+    // Extract capitalized words that could be merchants (if not starting the sentence)
+    const capitalizedWords = text.match(/(?<!^)[A-Z][a-z]{2,}/g);
     if (capitalizedWords) {
       for (const word of capitalizedWords) {
         if (word.length >= 3 && word.length <= 20) {
@@ -172,9 +176,13 @@ const VoiceAssistant = ({ onTransactionDetected, isListening, setIsListening, ba
       }
     }
     
-    // Return first few words as fallback
-    const words = text.split(' ');
-    return words.slice(0, 3).join(' ').replace(/[^a-zA-Z\s]/g, '');
+    // Return first few words minus the action verb as fallback
+    const words = text.replace(/^(paid|spent|bought|cost|invested|got)\s+/i, '').split(' ');
+    const fallback = words.slice(0, 3).join(' ').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    if (fallback.toLowerCase() === 'cash' || fallback.toLowerCase() === 'rupees' || fallback.toLowerCase() === 'rs') return '';
+    
+    // Capitalize first letter of fallback
+    return fallback ? fallback.charAt(0).toUpperCase() + fallback.slice(1) : '';
   };
 
   const extractCategory = (text) => {
@@ -349,7 +357,7 @@ const VoiceAssistant = ({ onTransactionDetected, isListening, setIsListening, ba
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
       <AnimatePresence>
         {isListening && (
           <motion.div

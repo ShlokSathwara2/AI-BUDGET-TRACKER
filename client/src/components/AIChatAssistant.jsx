@@ -38,32 +38,60 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
   // Financial analysis functions
   const analyzeSpending = () => {
     if (!transactions || transactions.length === 0) {
-      return "I don't have enough transaction data to provide insights yet. Please add some transactions first!";
+      return "I don't have enough transaction data to provide insights yet. Please log some expenses first!";
     }
 
     const now = new Date();
     const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     
-    const recentTransactions = transactions.filter(tx => 
-      new Date(tx.date) >= oneMonthAgo && tx.type === 'debit'
-    );
+    const allExpenses = transactions.filter(tx => tx.type === 'debit');
+    if (allExpenses.length === 0) return "You haven't recorded any expenses yet! You're doing great at saving, or you need to log some data.";
+
+    const recentTransactions = allExpenses.filter(tx => new Date(tx.date || tx.createdAt) >= oneMonthAgo);
     
-    const totalSpent = recentTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+    if (recentTransactions.length === 0) {
+      return "You have no expenses recorded in the last 30 days. Add some recent transactions for me to analyze!";
+    }
+
+    const totalSpent = recentTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     const avgDailySpending = totalSpent / 30;
     
     const categorySpending = {};
     recentTransactions.forEach(tx => {
       const category = tx.category || 'Other';
-      categorySpending[category] = (categorySpending[category] || 0) + (tx.amount || 0);
+      categorySpending[category] = (categorySpending[category] || 0) + (Number(tx.amount) || 0);
     });
     
-    const topCategory = Object.entries(categorySpending)
-      .sort(([,a], [,b]) => b - a)[0];
+    const sortedCategories = Object.entries(categorySpending).sort(([,a], [,b]) => b - a);
+    const topCategory = sortedCategories[0];
+    const secondCategory = sortedCategories[1];
+
+    const biggestExpense = [...recentTransactions].sort((a,b) => Number(b.amount) - Number(a.amount))[0];
     
-    return `Based on your recent spending (last 30 days):
-    • Total spent: ₹${totalSpent.toLocaleString()}
-    • Average daily spending: ₹${avgDailySpending.toFixed(2)}
-    • Your biggest spending category: ${topCategory ? `${topCategory[0]} (₹${topCategory[1].toLocaleString()})` : 'No clear pattern'}`;
+    let analysis = `**Last 30 Days Spending Analysis:**\n\n` +
+                   `• **Total spent:** ₹${totalSpent.toLocaleString()}\n` +
+                   `• **Daily burn rate:** ₹${Math.round(avgDailySpending).toLocaleString()}/day\n`;
+                   
+    if (topCategory) {
+      analysis += `• **Highest category:** ${topCategory[0]} (₹${topCategory[1].toLocaleString()})\n`;
+    }
+    if (secondCategory) {
+      analysis += `• **Runner up:** ${secondCategory[0]} (₹${secondCategory[1].toLocaleString()})\n`;
+    }
+    if (biggestExpense) {
+      analysis += `• **Largest single expense:** ₹${Number(biggestExpense.amount).toLocaleString()} at ${biggestExpense.merchant || 'Unknown'}\n`;
+    }
+    
+    // Add a smart insight
+    if (topCategory && topCategory[1] > (totalSpent * 0.4)) {
+      analysis += `\n**💡 Insight:** You're spending over 40% of your money just on ${topCategory[0]}. Consider setting a strict budget limit for this category!`;
+    } else if (avgDailySpending > 2000) {
+      analysis += `\n**💡 Insight:** Your daily burn rate is quite high (₹${Math.round(avgDailySpending).toLocaleString()}/day). Try observing a few strict "no-spend" days to bring this down.`;
+    } else {
+      analysis += `\n**💡 Insight:** Your spending is fairly distributed! Keep tracking your expenses to maintain this balance.`;
+    }
+
+    return analysis;
   };
 
   const provideSavingsAdvice = () => {
@@ -74,18 +102,32 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
     const incomeTransactions = transactions.filter(tx => tx.type === 'credit');
     const expenseTransactions = transactions.filter(tx => tx.type === 'debit');
     
-    const totalIncome = incomeTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const totalExpenses = expenseTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+    const now = new Date();
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     
-    let advice = `Your current savings rate is ${savingsRate.toFixed(1)}%. `;
+    // Calculate for the last 30 days for more relevant advice
+    const recentIncome = incomeTransactions.filter(tx => new Date(tx.date || tx.createdAt) >= oneMonthAgo).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const recentExpenses = expenseTransactions.filter(tx => new Date(tx.date || tx.createdAt) >= oneMonthAgo).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
     
-    if (savingsRate < 10) {
-      advice += "This is below the recommended 20%. Consider reducing discretionary spending in categories like dining, entertainment, or shopping.";
+    const inc = recentIncome > 0 ? recentIncome : incomeTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const exp = recentIncome > 0 ? recentExpenses : expenseTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    
+    if (inc === 0) {
+      return "I can't see any income recorded yet. Please log your salary or earnings so I can calculate your savings rate!";
+    }
+    
+    const savingsRate = ((inc - exp) / inc) * 100;
+    
+    let advice = `Based on your recent data, your current savings rate is **${savingsRate.toFixed(1)}%**.\n\n`;
+    
+    if (savingsRate < 0) {
+      advice += "⚠️ **Warning:** You are spending more than you earn! Immediately review your recent expenses and cut down on non-essential categories like dining or entertainment.";
+    } else if (savingsRate < 10) {
+      advice += "This is below the recommended 20%. Consider reducing discretionary spending. Look at your top expenses and try the 50/30/20 rule (50% Needs, 30% Wants, 20% Savings).";
     } else if (savingsRate < 20) {
-      advice += "You're doing well, but could aim for the 20% savings benchmark. Look for small optimizations in your monthly expenses.";
+      advice += "You're doing well, but could aim for the 20% savings benchmark. Look for small monthly subscriptions or impulse buys to optimize.";
     } else {
-      advice += "Excellent! You're maintaining a healthy savings rate. Consider investing some of these savings for better returns.";
+      advice += "🌟 **Excellent!** You're maintaining a healthy savings rate above 20%. Consider investing your surplus into index funds, mutual funds, or an emergency fund if you don't have one yet.";
     }
     
     return advice;
@@ -95,64 +137,104 @@ const AIChatAssistant = ({ transactions = [], bankAccounts = [], isVisible, setI
     const safeBankAccounts = Array.isArray(bankAccounts) ? bankAccounts : [];
     
     if (!safeBankAccounts || safeBankAccounts.length === 0) {
-      return "You haven't added any bank accounts yet. Please add your accounts to get detailed analysis.";
+      return "You haven't added any bank accounts yet. Please add your accounts in the Bank Accounts page first.";
     }
     
+    if (!accountName || accountName.trim() === '') {
+      // General overview
+      const totalBalance = safeBankAccounts.reduce((sum, acc) => sum + (Number(acc.balance) || 0), 0);
+      return `You have ${safeBankAccounts.length} linked account(s) with a total combined balance of **₹${totalBalance.toLocaleString()}**.\n\nYour accounts: ${safeBankAccounts.map(a => a.name).join(', ')}.`;
+    }
+
     const account = safeBankAccounts.find(acc => 
       acc?.name?.toLowerCase().includes(accountName.toLowerCase()) || 
       acc?.lastFourDigits === accountName
     );
     
     if (!account) {
-      return `I couldn't find an account matching "${accountName}". Your accounts are: ${safeBankAccounts.map(acc => acc?.name || 'Unknown').join(', ')}`;
+      return `I couldn't find an account matching "${accountName}". Your current accounts are: ${safeBankAccounts.map(acc => acc.name).join(', ')}`;
     }
     
     const accountTransactions = transactions.filter(tx => tx.bankAccountId === account.id);
-    const income = accountTransactions.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const expenses = accountTransactions.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const balance = income - expenses;
+    const income = accountTransactions.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const expenses = accountTransactions.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const netFlow = income - expenses;
     
-    return `Analysis for ${account.name}:
-    • Current balance: ₹${balance.toLocaleString()}
-    • Total income: ₹${income.toLocaleString()}
-    • Total expenses: ₹${expenses.toLocaleString()}
-    • Net flow: ${balance >= 0 ? '+' : ''}₹${balance.toLocaleString()}`;
+    return `**Analysis for ${account.name}** (ending in ${account.lastFourDigits || 'XXXX'}):\n\n` +
+           `• **Current balance:** ₹${Number(account.balance).toLocaleString()}\n` +
+           `• **Total income routed here:** ₹${income.toLocaleString()}\n` +
+           `• **Total expenses paid from here:** ₹${expenses.toLocaleString()}\n` +
+           `• **Net flow:** ${netFlow >= 0 ? '+' : ''}₹${netFlow.toLocaleString()}`;
+  };
+
+  const findHighestExpense = () => {
+    const allExpenses = transactions.filter(tx => tx.type === 'debit');
+    if (allExpenses.length === 0) return "You haven't recorded any expenses yet.";
+    
+    const biggest = allExpenses.sort((a,b) => Number(b.amount) - Number(a.amount))[0];
+    const date = new Date(biggest.date || biggest.createdAt).toLocaleDateString();
+    
+    return `Your highest recorded expense is **₹${Number(biggest.amount).toLocaleString()}**.\n\n` +
+           `It was spent on **${biggest.merchant || 'Unknown Merchant'}** (${biggest.category}) on ${date}.`;
   };
 
   const generateResponse = async (userMessage) => {
     const message = userMessage.toLowerCase();
     
-    // Financial advice patterns
-    if (message.includes('spend') || message.includes('spending') || message.includes('expense')) {
+    // Algorithmic Keyword Intent Scoring
+    const intents = {
+      spend_analysis: ['spend', 'spending', 'expense', 'analyze', 'analysis', 'where does my money'],
+      savings_advice: ['save', 'savings', 'saving', 'advice', 'how to save'],
+      account_info: ['account', 'balance', 'bank', 'wallet'],
+      highest_expense: ['highest', 'biggest', 'largest', 'most expensive', 'maximum'],
+      budgeting: ['budget', 'plan', 'rule', 'manage'],
+      investing: ['invest', 'investment', 'grow money', 'stocks', 'mutual funds']
+    };
+
+    let matchedIntent = null;
+    let maxMatches = 0;
+
+    for (const [intent, keywords] of Object.entries(intents)) {
+      const matches = keywords.filter(kw => message.includes(kw)).length;
+      if (matches > maxMatches) {
+        maxMatches = matches;
+        matchedIntent = intent;
+      }
+    }
+
+    // Exact handling for highest expense before general spending
+    if (matchedIntent === 'highest_expense') {
+      return findHighestExpense();
+    }
+    if (matchedIntent === 'spend_analysis') {
       return analyzeSpending();
     }
-    
-    if (message.includes('save') || message.includes('savings') || message.includes('saving')) {
+    if (matchedIntent === 'savings_advice') {
       return provideSavingsAdvice();
     }
-    
-    if (message.includes('account') || message.includes('balance')) {
-      const accountName = message.split('account')[1] || message.split('balance')[1] || '';
-      return accountAnalysis(accountName.trim());
+    if (matchedIntent === 'account_info') {
+      const accountName = message.replace(/(tell me about|what is|how much|in my|my|the|account|balance)/g, '').trim();
+      return accountAnalysis(accountName);
+    }
+    if (matchedIntent === 'budgeting') {
+      return "I strongly recommend the **50/30/20 budget framework**:\n\n" +
+             "• **50% Needs:** Rent, groceries, bills, EMIs.\n" +
+             "• **30% Wants:** Dining out, movies, hobbies, shopping.\n" +
+             "• **20% Savings:** Investments, emergency fund, debt payoff.\n\n" +
+             "Try tracking your expenses against these buckets using the Analytics page!";
+    }
+    if (matchedIntent === 'investing') {
+      return "Before investing, ensure you have an **emergency fund** (3-6 months of expenses) saved in a liquid bank account.\n\n" +
+             "Once that's secure, consider low-cost Index Mutual Funds (like Nifty 50) for long-term growth. If you want lower risk, look into Fixed Deposits or Government Bonds. Always assess your risk tolerance before investing.";
     }
     
-    if (message.includes('budget') || message.includes('plan')) {
-      return "I'd be happy to help with budgeting! Consider following the 50/30/20 rule: 50% needs, 30% wants, 20% savings. Based on your income, I can help you calculate specific amounts for each category.";
+    // Context-aware fallback
+    if (transactions.length > 0) {
+      const latestTx = transactions[0];
+      return `I see you recently logged a ${latestTx.type} of ₹${latestTx.amount} for ${latestTx.category}. Would you like me to analyze your overall spending, review your savings rate, or check your account balances?`;
     }
-    
-    if (message.includes('invest') || message.includes('investment')) {
-      return "For investments, consider starting with emergency funds (3-6 months expenses), then low-risk options like mutual funds or index funds. Your risk tolerance and time horizon should guide your investment strategy.";
-    }
-    
-    // Default responses
-    const responses = [
-      "I'd be happy to help with that! Could you be more specific about what financial advice you need?",
-      "That's a great question! Let me know more details so I can provide personalized guidance.",
-      "I can help you with budgeting, saving, spending analysis, and financial planning. What area would you like to focus on?",
-      "For the best advice, I'll need to understand your specific situation. Can you tell me more about your financial goals?"
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
+
+    return "I am your AI Financial Advisor! You can ask me things like:\n\n• 'Analyze my spending'\n• 'How can I save more?'\n• 'What is my highest expense?'\n• 'Tell me my account balances'";
   };
 
   const handleSendMessage = async () => {
