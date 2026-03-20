@@ -3,12 +3,8 @@
 [![GitHub](https://img.shields.io/github/license/ShlokSathwara/AI-BUDGET-TRACKER)](https://github.com/ShlokSathwara/AI-BUDGET-TRACKER/blob/main/LICENSE)
 [![React](https://img.shields.io/badge/React-19.2.0-blue.svg)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-brightgreen.svg)](https://www.mongodb.com/)
 
 **A comprehensive AI-powered budget tracking application with real-time transaction categorization, intelligent insights, automated payment reminders, and multi-platform support (Web + Mobile).**
-
-🌐 **Live Demo:** [Vercel](https://your-frontend-domain.vercel.app)  
-🚀 **Backend API:** [Render](https://your-backend-domain.onrender.com)
 
 ---
 
@@ -283,7 +279,6 @@ Ensure you have the following installed:
 - **Node.js** v18+ ([Download](https://nodejs.org/))
 - **npm** v9+ (comes with Node.js)
 - **Git** ([Download](https://git-scm.com/))
-- **MongoDB Atlas** account (for cloud database) OR use SQLite (default)
 
 ### Installation (5 Minutes)
 
@@ -313,8 +308,6 @@ npm install
 Create `server/.env` file:
 
 ```env
-# MongoDB Configuration (Optional - SQLite works by default)
-MONGO_URI=mongodb+srv://your-user:password@cluster.mongodb.net/budgetDB?retryWrites=true&w=majority
 
 # JWT Secret for Authentication
 JWT_SECRET=your_super_secret_jwt_key_here
@@ -431,9 +424,6 @@ Open `client/public/test-crash-fixes.html` in your browser to run automated test
 #### Backend (`server/.env`)
 
 ```env
-# Database (Choose one)
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/budgetDB
-# OR use SQLite (default, no config needed)
 
 # Authentication
 JWT_SECRET=your-secret-key-here
@@ -464,9 +454,7 @@ VITE_API_BASE=http://localhost:5000
 # VITE_API_BASE=https://your-backend-url.com
 ```
 
-### Database Options
-
-#### Option 1: SQLite (Default - Recommended for Development)
+#### Database Configuration
 
 No configuration needed! Just run:
 
@@ -475,19 +463,7 @@ cd server
 npm run dev
 ```
 
-Data stored in `server/data.db`
-
-#### Option 2: MongoDB Atlas (Production)
-
-1. Create free account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-2. Create cluster and get connection string
-3. Update `MONGO_URI` in `server/.env`
-4. Run:
-
-```bash
-cd server
-npm run backend
-```
+Data stored locally in `server/data.db`
 
 ---
 
@@ -495,7 +471,6 @@ npm run backend
 
 ### Base URL
 - **Development:** `http://localhost:5000`
-- **Production:** `https://your-backend-domain.onrender.com`
 
 ### Authentication Endpoints
 
