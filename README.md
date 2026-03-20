@@ -7,8 +7,8 @@
 
 **A comprehensive AI-powered budget tracking application with real-time transaction categorization, intelligent insights, automated payment reminders, and multi-platform support (Web + Mobile).**
 
-🌐 **Live Demo:** [GitHub Pages](https://github.com/ShlokSathwara/AI-BUDGET-TRACKER)  
-🚀 **Backend API:** [Render](https://ai-budget-tracker-pqax.onrender.com)
+🌐 **Live Demo:** [Vercel](https://your-frontend-domain.vercel.app)  
+🚀 **Backend API:** [Render](https://your-backend-domain.onrender.com)
 
 ---
 
@@ -309,7 +309,7 @@ Create `server/.env` file:
 MONGO_URI=mongodb+srv://your-user:password@cluster.mongodb.net/budgetDB?retryWrites=true&w=majority
 
 # JWT Secret for Authentication
-JWT_SECRET=aI8kL9mN2pQ7rS5tU3vW4xY1zAbCdEfGhIjKlMnOpQrStUvWxYz
+JWT_SECRET=your_super_secret_jwt_key_here
 
 # Server Port
 PORT=5000
@@ -487,7 +487,7 @@ npm run backend
 
 ### Base URL
 - **Development:** `http://localhost:5000`
-- **Production:** `https://ai-budget-tracker-pqax.onrender.com`
+- **Production:** `https://your-backend-domain.onrender.com`
 
 ### Authentication Endpoints
 
