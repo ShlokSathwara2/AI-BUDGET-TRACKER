@@ -208,8 +208,8 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
     setDismissedAlerts(prev => new Set(prev).add(alertId));
   };
 
-  const clearDismissedAlerts = () => {
-    setAlerts(prev => prev.filter(alert => !dismissedAlerts.has(alert.id)));
+  const clearAllAlerts = () => {
+    setAlerts([]);
     setDismissedAlerts(new Set());
   };
 
@@ -235,10 +235,10 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
         
         {activeAlerts.length > 0 && (
           <button
-            onClick={clearDismissedAlerts}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm"
+            onClick={clearAllAlerts}
+            className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 rounded-lg transition-colors text-sm font-medium"
           >
-            Clear Alerts
+            Clear All Alerts
           </button>
         )}
       </div>
@@ -318,54 +318,72 @@ const SmartOverspendingAlerts = ({ transactions = [], user }) => {
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-            <h4 className="text-sm font-medium text-gray-300 mb-2">Top Categories This Month</h4>
-            <div className="space-y-2">
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 flex flex-col h-full">
+            <h4 className="text-sm font-medium text-gray-300 mb-3 pb-2 border-b border-white/5">Category Breakdown This Month</h4>
+            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar flex-1">
               {Object.entries(analyzeSpendingPatterns)
                 .sort((a, b) => b[1].currentMonthlySpending - a[1].currentMonthlySpending)
-                .slice(0, 3)
                 .map(([category, data]) => (
-                  <div key={category} className="flex justify-between items-center">
+                  <div key={category} className="flex justify-between items-center py-1.5 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors px-1 rounded-md">
                     <span className="text-white text-sm">{category}</span>
-                    <span className="text-gray-300 text-sm">₹{data.currentMonthlySpending.toLocaleString()}</span>
+                    <span className="text-gray-300 text-sm font-semibold">₹{data.currentMonthlySpending.toLocaleString()}</span>
                   </div>
                 ))}
+              {Object.keys(analyzeSpendingPatterns).length === 0 && (
+                <p className="text-gray-500 text-sm text-center py-4 italic">No spending data for this month</p>
+              )}
             </div>
           </div>
           
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-            <h4 className="text-sm font-medium text-gray-300 mb-2">Anomaly Detection Status</h4>
-            <div className="space-y-2">
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 flex flex-col">
+            <h4 className="text-sm font-medium text-gray-300 mb-3 pb-2 border-b border-white/5">Anomaly Detection Status</h4>
+            <div className="space-y-4 flex-1">
               <div className="flex justify-between items-center">
                 <span className="text-white text-sm">Weekly Patterns</span>
-                <span className={`text-sm ${
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                   Object.values(analyzeSpendingPatterns).some(data => data.weeklyAnomaly) 
-                    ? 'text-red-400' 
-                    : 'text-green-400'
+                    ? 'bg-red-500/20 text-red-400' 
+                    : 'bg-green-500/20 text-green-400'
                 }`}>
                   {Object.values(analyzeSpendingPatterns).some(data => data.weeklyAnomaly) ? 'Anomalies Found' : 'Normal'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-white text-sm">Monthly Patterns</span>
-                <span className={`text-sm ${
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                   Object.values(analyzeSpendingPatterns).some(data => data.monthlyAnomaly) 
-                    ? 'text-red-400' 
-                    : 'text-green-400'
+                    ? 'bg-red-500/20 text-red-400' 
+                    : 'bg-green-500/20 text-green-400'
                 }`}>
                   {Object.values(analyzeSpendingPatterns).some(data => data.monthlyAnomaly) ? 'Anomalies Found' : 'Normal'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-white text-sm">Overall Risk</span>
-                <span className={`text-sm ${
-                  activeAlerts.length > 2 ? 'text-red-400' : 
-                  activeAlerts.length > 0 ? 'text-yellow-400' : 'text-green-400'
+                <div className="flex items-center space-x-2">
+                  <span className="text-white text-sm">Overall Risk Profile</span>
+                  <div className="group relative">
+                    <span className="text-xs text-gray-500 cursor-help underline decoration-dotted">?</span>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 border border-white/10 rounded text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      Risk is calculated based on current active alerts and anomaly counts.
+                    </div>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                  activeAlerts.length > 2 ? 'bg-red-500 text-white' : 
+                  activeAlerts.length > 0 ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'
                 }`}>
-                  {activeAlerts.length > 2 ? 'High' : 
-                   activeAlerts.length > 0 ? 'Medium' : 'Low'}
+                  {activeAlerts.length > 2 ? 'High Risk' : 
+                   activeAlerts.length > 0 ? 'Medium Risk' : 'Healthy'}
                 </span>
               </div>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-xs text-blue-300">
+                <span className="font-bold">AI Tip:</span> {activeAlerts.length > 0 
+                  ? "Consider reviewing the high-spend categories listed on the left to optimize your budget."
+                  : "Maintain your current spending pace to hit your monthly savings goal."}
+              </p>
             </div>
           </div>
         </div>

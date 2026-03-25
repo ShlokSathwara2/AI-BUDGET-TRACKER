@@ -7,6 +7,13 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
   const [timeRange, setTimeRange] = useState('month');
   const [chartType, setChartType] = useState('both'); // 'both', 'income', 'expenses'
   const [selectedAccount, setSelectedAccount] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
+
+  const categories = React.useMemo(() => {
+    const cats = new Set(transactions.map(t => t.category).filter(Boolean));
+    return ['all', ...Array.from(cats).sort()];
+  }, [transactions]);
 
   // Filter transactions by time range and account
   const filteredTransactions = transactions.filter(tx => {
@@ -16,6 +23,12 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
     
     // Filter by account if not 'all'
     if (selectedAccount !== 'all' && tx.bankAccountId !== selectedAccount) return false;
+
+    // Filter by category if not 'all'
+    if (selectedCategory !== 'all' && tx.category !== selectedCategory) return false;
+
+    // Filter by payment method if not 'all'
+    if (selectedPaymentMethod !== 'all' && tx.paymentMethod !== selectedPaymentMethod) return false;
     
     const now = new Date();
     const diffTime = Math.abs(now - txDate);
@@ -28,6 +41,8 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
         return diffDays <= 30;
       case 'year':
         return diffDays <= 365;
+      case 'all':
+        return true;
       default:
         return true;
     }
@@ -180,11 +195,36 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
           </select>
           
           <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[150px] truncate"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat}>
+                {cat === 'all' ? 'All Categories' : cat}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedPaymentMethod}
+            onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+            className="px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Methods</option>
+            <option value="net_banking">Net Banking</option>
+            <option value="upi">UPI</option>
+            <option value="credit_card">Credit Card</option>
+            <option value="debit_card">Debit Card</option>
+            <option value="cash">Cash</option>
+          </select>
+
+          <select
             value={chartType}
             onChange={(e) => setChartType(e.target.value)}
             className="px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="both">Both</option>
+            <option value="both">Both Type</option>
             <option value="income">Income Only</option>
             <option value="expenses">Expenses Only</option>
           </select>
@@ -194,6 +234,7 @@ const Analytics = ({ transactions = [], bankAccounts = [] }) => {
             onChange={(e) => setTimeRange(e.target.value)}
             className="px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="all">All Time</option>
             <option value="week">Last Week</option>
             <option value="month">Last Month</option>
             <option value="year">Last Year</option>

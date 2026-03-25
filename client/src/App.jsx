@@ -561,6 +561,8 @@ const TransactionsPage = ({ transactions, bankAccounts, onAdd, onUpdate, onDelet
   const [showEdit, setShowEdit] = useState(false);
   const [filterAccount, setFilterAccount]   = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState('all');
+  const [filterDateRange, setFilterDateRange] = useState('all');
 
   const safe = Array.isArray(transactions) ? transactions : [];
 
@@ -583,9 +585,32 @@ const TransactionsPage = ({ transactions, bankAccounts, onAdd, onUpdate, onDelet
       // Category Filter
       if (filterCategory !== 'all' && tx.category !== filterCategory) return false;
 
+      // Payment Method Filter
+      if (filterPaymentMethod !== 'all' && tx.paymentMethod !== filterPaymentMethod) return false;
+
+      // Date Range Filter
+      if (filterDateRange !== 'all') {
+        const txDate = new Date(tx.date || tx.createdAt);
+        const now = new Date();
+        const diffTime = Math.abs(now - txDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (filterDateRange === 'last_week' && diffDays > 7) return false;
+        if (filterDateRange === 'last_month' && diffDays > 30) return false;
+        if (filterDateRange === 'last_year' && diffDays > 365) return false;
+      }
+
       return true;
     });
-  }, [safe, filterAccount, filterCategory]);
+  }, [safe, filterAccount, filterCategory, filterPaymentMethod, filterDateRange]);
+
+  const { filteredIncome, filteredExpense } = useMemo(() => {
+    return filteredTransactions.reduce((acc, tx) => {
+      if (tx.type === 'credit') acc.filteredIncome += (tx.amount || 0);
+      else acc.filteredExpense += (tx.amount || 0);
+      return acc;
+    }, { filteredIncome: 0, filteredExpense: 0 });
+  }, [filteredTransactions]);
 
   return (
     <div className="space-y-6">
@@ -607,7 +632,7 @@ const TransactionsPage = ({ transactions, bankAccounts, onAdd, onUpdate, onDelet
       {tab === 'credit'  && <AddCreditTransaction onAdd={onAdd} accounts={bankAccounts}/>}
       {tab === 'cash'    && <AddCashTransaction   onAdd={onAdd} accounts={bankAccounts}/>}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-400">Filter by Account</label>
           <select
@@ -637,6 +662,45 @@ const TransactionsPage = ({ transactions, bankAccounts, onAdd, onUpdate, onDelet
               </option>
             ))}
           </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-400">Payment Mode</label>
+          <select
+            value={filterPaymentMethod}
+            onChange={(e) => setFilterPaymentMethod(e.target.value)}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            <option value="all" className="bg-gray-900">All Methods</option>
+            <option value="net_banking" className="bg-gray-900">Net Banking</option>
+            <option value="upi" className="bg-gray-900">UPI</option>
+            <option value="credit_card" className="bg-gray-900">Credit Card</option>
+            <option value="debit_card" className="bg-gray-900">Debit Card</option>
+            <option value="cash" className="bg-gray-900">Cash</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-400">Time Range</label>
+          <select
+            value={filterDateRange}
+            onChange={(e) => setFilterDateRange(e.target.value)}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            <option value="all" className="bg-gray-900">All Time</option>
+            <option value="last_week" className="bg-gray-900">Last Week</option>
+            <option value="last_month" className="bg-gray-900">Last Month</option>
+            <option value="last_year" className="bg-gray-900">Last Year</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl backdrop-blur-md">
+          <p className="text-green-400 text-sm font-medium">Filtered Income</p>
+          <p className="text-2xl font-bold text-green-400 mt-1">₹{filteredIncome.toLocaleString()}</p>
+        </div>
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl backdrop-blur-md">
+          <p className="text-red-400 text-sm font-medium">Filtered Expense</p>
+          <p className="text-2xl font-bold text-red-400 mt-1">₹{filteredExpense.toLocaleString()}</p>
         </div>
       </div>
 
