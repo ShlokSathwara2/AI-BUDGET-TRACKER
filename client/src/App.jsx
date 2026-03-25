@@ -119,34 +119,97 @@ function useAppData(user) {
     if (txKey) save(txKey, newArr);
 
     // Update linked bank account balance
+    let affectedAccount = null;
     if (tx.bankAccountId && tx.mode !== 'cash') {
       const change    = tx.type === 'credit' ? amount : -amount;
       const freshAcc  = load(accKey, []);
-      const updAcc    = freshAcc.map(a =>
-        a?.id === tx.bankAccountId
-          ? { ...a, balance: (typeof a.balance === 'number' ? a.balance : 0) + change }
-          : a
-      );
+      const updAcc    = freshAcc.map(a => {
+        if (a?.id === tx.bankAccountId) {
+          const newBal = (typeof a.balance === 'number' ? a.balance : 0) + change;
+          affectedAccount = { ...a, balance: newBal };
+          return affectedAccount;
+        }
+        return a;
+      });
       _setAcc(updAcc);
       if (accKey) save(accKey, updAcc);
     }
 
-    return tx;
+    return { tx, affectedAccount };
   }, [uid, txKey, accKey]);
 
   const updateTransaction = useCallback((upd) => {
-    if (!uid) return;
-    const arr = load(txKey, []).map(t => t._id === upd._id ? { ...t, ...upd } : t);
+    if (!uid || !upd?._id) return null;
+    const freshTx = load(txKey, []);
+    const oldTx = freshTx.find(t => t._id === upd._id);
+    if (!oldTx) return null;
+
+    const newTx = { ...oldTx, ...upd, amount: parseFloat(upd.amount) || 0 };
+    const arr = freshTx.map(t => t._id === upd._id ? newTx : t);
     _setTx(arr);
     if (txKey) save(txKey, arr);
-  }, [uid, txKey]);
+
+    // Balance update logic
+    const affectedAccounts = [];
+    const affectedIds = new Set();
+    if (oldTx.bankAccountId && oldTx.mode !== 'cash') affectedIds.add(oldTx.bankAccountId);
+    if (newTx.bankAccountId && newTx.mode !== 'cash') affectedIds.add(newTx.bankAccountId);
+
+    if (affectedIds.size > 0) {
+      const freshAcc = load(accKey, []);
+      const updAcc = freshAcc.map(a => {
+        if (!affectedIds.has(a.id)) return a;
+        let newBalance = typeof a.balance === 'number' ? a.balance : 0;
+        
+        // Reverse old effect
+        if (a.id === oldTx.bankAccountId && oldTx.mode !== 'cash') {
+          const oldChange = oldTx.type === 'credit' ? oldTx.amount : -oldTx.amount;
+          newBalance -= oldChange;
+        }
+        
+        // Apply new effect
+        if (a.id === newTx.bankAccountId && newTx.mode !== 'cash') {
+          const newChange = newTx.type === 'credit' ? newTx.amount : -newTx.amount;
+          newBalance += newChange;
+        }
+        
+        const updated = { ...a, balance: newBalance };
+        affectedAccounts.push(updated);
+        return updated;
+      });
+      _setAcc(updAcc);
+      if (accKey) save(accKey, updAcc);
+    }
+    return { tx: newTx, affectedAccounts };
+  }, [uid, txKey, accKey]);
 
   const deleteTransaction = useCallback((id) => {
-    if (!uid) return;
-    const arr = load(txKey, []).filter(t => t._id !== id);
+    if (!uid) return null;
+    const freshTx = load(txKey, []);
+    const oldTxPath = freshTx.find(t => t._id === id);
+    if (!oldTxPath) return null;
+
+    const arr = freshTx.filter(t => t._id !== id);
     _setTx(arr);
     if (txKey) save(txKey, arr);
-  }, [uid, txKey]);
+
+    // Balance update logic
+    let affectedAccount = null;
+    if (oldTxPath.bankAccountId && oldTxPath.mode !== 'cash') {
+      const change = oldTxPath.type === 'credit' ? oldTxPath.amount : -oldTxPath.amount;
+      const freshAcc = load(accKey, []);
+      const updAcc = freshAcc.map(a => {
+        if (a?.id === oldTxPath.bankAccountId) {
+          affectedAccount = { ...a, balance: (typeof a.balance === 'number' ? a.balance : 0) - change };
+          return affectedAccount;
+        }
+        return a;
+      });
+      _setAcc(updAcc);
+      if (accKey) save(accKey, updAcc);
+    }
+    return { deletedId: id, affectedAccount };
+  }, [uid, txKey, accKey]);
 
   // ── Bank account actions ──
   const addBankAccount = useCallback((acc) => {
@@ -282,7 +345,7 @@ function useAppData(user) {
     _setRem(updRem);
     if (remKey) save(remKey, updRem);
 
-    return { success: true, tx };
+    return { success: true, tx, affectedAccount: updAcc.find(a => a.id === tx.bankAccountId) };
   }, [uid, txKey, accKey, remKey]);
 
   const resetAllData = useCallback(() => {
@@ -779,23 +842,39 @@ function AppContent() {
 
   // ── Transaction handlers ──
   const handleAddTransaction = useCallback((newTx) => {
-    const tx = addTransaction(newTx);
-    if (!tx) { showToast('❌ Failed to add transaction', 'error'); return; }
+    const result = addTransaction(newTx);
+    if (!result) { showToast('❌ Failed to add transaction', 'error'); return; }
+    const { tx, affectedAccount } = result;
     showToast(`✅ ${tx.type === 'credit' ? 'Income' : 'Expense'} of ₹${tx.amount.toLocaleString()} added!`);
-    if (user?.id) addTransactionAPI({ ...tx, user: user.id }).catch(() => {});
+    if (user?.id) {
+      addTransactionAPI({ ...tx, user: user.id }).catch(() => {});
+      if (affectedAccount) updateBankAccountAPI(affectedAccount).catch(() => {});
+    }
     return tx;
   }, [addTransaction, showToast, user]);
 
   const handleUpdateTransaction = useCallback((upd) => {
-    updateTransaction(upd);
+    const result = updateTransaction(upd);
+    if (!result) return;
+    const { tx, affectedAccounts } = result;
     showToast('✅ Transaction updated!');
-    if (user?.id) updateTransactionAPI(upd).catch(() => {});
+    if (user?.id) {
+      updateTransactionAPI(tx).catch(() => {});
+      if (affectedAccounts?.length) {
+        affectedAccounts.forEach(acc => updateBankAccountAPI(acc).catch(() => {}));
+      }
+    }
   }, [updateTransaction, showToast, user]);
 
   const handleDeleteTransaction = useCallback((id) => {
-    deleteTransaction(id);
+    const result = deleteTransaction(id);
+    if (!result) return;
+    const { affectedAccount } = result;
     showToast('✅ Transaction deleted!');
-    if (user?.id) deleteTransactionAPI(id).catch(() => {});
+    if (user?.id) {
+      deleteTransactionAPI(id).catch(() => {});
+      if (affectedAccount) updateBankAccountAPI(affectedAccount).catch(() => {});
+    }
   }, [deleteTransaction, showToast, user]);
 
   // ── Bank account handlers ──
@@ -820,6 +899,7 @@ function AppContent() {
     if (result.success) {
       showToast(`✅ Auto-debited ₹${reminder.amount.toLocaleString()} for "${reminder.title}"`);
       if (user?.id && result.tx) addTransactionAPI({ ...result.tx, user: user.id }).catch(() => {});
+      if (user?.id && result.affectedAccount) updateBankAccountAPI(result.affectedAccount).catch(() => {});
       if (user?.id) updatePaymentReminderAPI({ ...reminder, completed: true, lastPaid: new Date().toISOString(), user_id: user.id }).catch(() => {});
     } else if (result.insufficient) {
       showToast(`⚠️ Insufficient balance for "${reminder.title}"`, 'warning');
