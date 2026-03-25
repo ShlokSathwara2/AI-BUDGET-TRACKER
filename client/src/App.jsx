@@ -559,7 +559,33 @@ const TransactionsPage = ({ transactions, bankAccounts, onAdd, onUpdate, onDelet
   const [tab, setTab]       = useState('expense');
   const [editTx, setEditTx] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
+  const [filterAccount, setFilterAccount]   = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+
   const safe = Array.isArray(transactions) ? transactions : [];
+
+  const categories = useMemo(() => {
+    const cats = new Set(safe.map(t => t.category).filter(Boolean));
+    return ['all', ...Array.from(cats).sort()];
+  }, [safe]);
+
+  const filteredTransactions = useMemo(() => {
+    return safe.filter(tx => {
+      // Account Filter
+      if (filterAccount !== 'all') {
+        if (filterAccount === 'cash') {
+          if (tx.paymentMethod !== 'cash') return false;
+        } else if (tx.bankAccountId !== filterAccount) {
+          return false;
+        }
+      }
+
+      // Category Filter
+      if (filterCategory !== 'all' && tx.category !== filterCategory) return false;
+
+      return true;
+    });
+  }, [safe, filterAccount, filterCategory]);
 
   return (
     <div className="space-y-6">
@@ -581,13 +607,46 @@ const TransactionsPage = ({ transactions, bankAccounts, onAdd, onUpdate, onDelet
       {tab === 'credit'  && <AddCreditTransaction onAdd={onAdd} accounts={bankAccounts}/>}
       {tab === 'cash'    && <AddCashTransaction   onAdd={onAdd} accounts={bankAccounts}/>}
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-400">Filter by Account</label>
+          <select
+            value={filterAccount}
+            onChange={(e) => setFilterAccount(e.target.value)}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            <option value="all" className="bg-gray-900">All Accounts</option>
+            <option value="cash" className="bg-gray-900">Cash Only</option>
+            {(bankAccounts || []).map(acc => (
+              <option key={acc.id} value={acc.id} className="bg-gray-900">
+                {acc.name} (****{acc.lastFourDigits})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-400">Filter by Category</label>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat} className="bg-gray-900">
+                {cat === 'all' ? 'All Categories' : cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
-        <h2 className="text-xl font-bold text-white mb-4">All Transactions ({safe.length})</h2>
-        {safe.length === 0
-          ? <p className="text-gray-400 text-center py-8">No transactions yet.</p>
+        <h2 className="text-xl font-bold text-white mb-4">Transactions ({filteredTransactions.length})</h2>
+        {filteredTransactions.length === 0
+          ? <p className="text-gray-400 text-center py-8">No matching transactions found.</p>
           : (
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              {safe.map(tx => (
+              {filteredTransactions.map(tx => (
                 <div key={tx._id}
                   className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all">
                   <div className="flex-1 min-w-0">
